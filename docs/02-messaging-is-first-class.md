@@ -1,88 +1,92 @@
 ---
-title: Rung 2 - Messaging is first-class
-description: One new idea built on Rung 1. The @KafkaListener is a peer of HTTP endpoints, with its own baselines via dt.service.messaging.process.*
+title: Rung 2 - Endpoints are the unit of health
+description: Now that the service collapsed, look inside. Endpoints are where per-feature health lives, and they are all baselined automatically.
 rung: 2
 last_updated: 2026-04-17
 ---
 
-# Rung 2: Messaging is first-class
+# Rung 2: Endpoints are the unit of health
 
-Recap of Rung 1: endpoints are the unit of health. You no longer split
-services to get per-feature visibility on HTTP endpoints.
+Recap of Rung 1: the SDv1 fragmentation collapsed into one UNIFIED
+service named `orders-sdv2 -- orders-demo`. No more per-controller
+service entities.
+
+The natural next question is: if I do not have separate services for
+`OrderController` and `InventoryController` anymore, how do I measure
+them separately? The answer is what this rung teaches.
 
 ## The new idea
 
-> In SDv2, a Kafka consumer is a peer of an HTTP endpoint. It gets its
-> own baselines via `dt.service.messaging.process.*`, with
-> `messaging.destination.name` as a first-class dimension.
+> In SDv2, **endpoints** are the unit of per-feature health. Every
+> endpoint the UNIFIED service exposes is detected and baselined
+> automatically, with no key-request nomination required.
 
-In SDv1, the `@KafkaListener` in this same JVM was invisible or
-awkward. In SDv2, look at the same service and you see it sitting
-next to the HTTP endpoints.
+## Open the SDv2 service and click into Endpoints
 
-## Look at the `orders-demo` service in `orders-sdv2`
+Open `orders-sdv2 -- orders-demo`. The Endpoints panel should show,
+over ~15 minutes of traffic:
 
-Open the **Endpoints** panel again. Alongside the three HTTP endpoints
-from Rung 1, you should see:
+- `POST /orders/submit`
+- `GET /orders/search`
+- `GET /inventory/check`
+- `order-events` (Kafka consumer - covered in depth in Rung 3)
 
-- `order-events` (messaging)
+Each endpoint has:
 
-That is the Kafka topic that the `@KafkaListener` consumes. It has:
-
+- Its own response-time chart and baseline.
+- Its own failure rate.
 - Its own throughput.
-- Its own duration chart for message processing.
-- Its own failure rate. The seeded 2% bad payloads show up here.
-- Dimensions: `messaging.system = kafka`,
-  `messaging.destination.name = order-events`.
+- Its own dimensions (HTTP: `http.route`, `http.response.status_code`;
+  messaging: `messaging.destination.name`, `messaging.system`).
 
-None of this was configured. The listener is instrumented by OneAgent
-and the metric family does the rest.
+None of this required a key-request nomination. You did not configure
+any splitting rule. The endpoints are discovered from span attributes.
 
-## Compare to `orders-sdv1`
+## Compare to the SDv1 side
 
-On the SDv1 side, the Kafka consumer is harder to find. If it shows up at
-all, it is usually either:
+Go back to `orders-demo - OrderController` in the `orders-sdv1`
+namespace. The service-level chart averages every endpoint on that
+controller. `POST /orders/submit` (strict envelope) and
+`GET /orders/search` (loose envelope with a long tail) are mashed
+together in one number. To tighten that, the customer would have
+manually nominated each as a key request.
 
-- Lumped into the service's request metrics because SDv1 mirrored
-  `messaging.process` into `request.*` in some paths. Failure rates and
-  latencies on the consumer are mixed with HTTP traffic.
-- Floating as background activity with no baseline.
+On the SDv2 side, those two endpoints have independent baselines
+*and* the service-level chart coalesces them as **Transactions** for
+the overview. You get both levels without choosing between them.
 
-In SDv1 you would have needed a custom service or a request-attribute
-rule to give the listener its own identity. You rarely did, because
-the cost outweighed the value.
+## The three metric families behind the scenes
 
-## The three metric families
+Each endpoint's metrics live in one of three families:
 
-In the Services app, pick any endpoint and notice the metric family
-prefix in the chart's query. The family is the data model:
-
-| Family | What goes here | Dimensions you can slice by |
+| Family | Used by | Key dimensions |
 |---|---|---|
-| `dt.service.request.*` | HTTP, gRPC, RMI, web-tech | `http.route`, `http.response.status_code` |
-| `dt.service.messaging.process.*` | Kafka, RabbitMQ, JMS consumers | `messaging.destination.name`, `messaging.system` |
-| `dt.service.faas_invoke.*` | Lambda, Azure Functions, Cloud Functions | `faas.trigger` |
+| `dt.service.request.*` | `POST /orders/submit`, `GET /orders/search`, `GET /inventory/check` | `http.route`, `http.response.status_code` |
+| `dt.service.messaging.process.*` | `order-events` Kafka consumer | `messaging.destination.name`, `messaging.system` |
+| `dt.service.faas_invoke.*` | (not used here - Lambda triggers, etc.) | `faas.trigger` |
 
-The UI coalesces the three under the umbrella term **Transactions** on
-the service overview. You get one health number for the service AND
-per-family drilldown. SDv1 had no clean way to do both.
+The Services app coalesces these under the umbrella term
+**Transactions** on the service overview. So the UNIFIED service gets
+one "how's it going" number and per-family drilldown simultaneously.
 
-This demo uses `request.*` and `messaging.process.*`. If you had a
-Lambda running on the side, `faas_invoke.*` would join the picture
-without a schema change.
+## What disappeared from the workflow
 
-## Failure unification (preview of Rung 4)
+| SDv1 | SDv2 |
+|---|---|
+| Nominate key requests on each split service | Nothing. Endpoints are baselined. |
+| Build dashboards per split service | Build one dashboard, filter by endpoint. |
+| Maintain naming rules so charts read right | Endpoint names come from spans (HTTP route, messaging destination). |
+| Rebuild when a controller is added | Endpoint appears, nothing to rebuild. |
 
-Notice `transaction.is_failed` as a span attribute on traces from both
-the HTTP endpoints and the Kafka consumer. That is the unified failure
-indicator. Rung 4 will return to this when we trace a bad order from
-`/orders/submit` through the Kafka hop.
+The configuration did not move somewhere else. It is gone, because the
+axis of health moved from "service" to "endpoint".
 
 ## What you now know
 
-> Kafka consumers are peers of HTTP endpoints in SDv2. They share the
-> Transactions umbrella at the service level and have their own metric
-> family underneath. Async and event-driven code finally shows up in the
-> same health model as HTTP.
+> Endpoints, not services, are the unit of per-feature health in SDv2.
+> Every endpoint gets a baseline automatically, so the key-request
+> mechanism of SDv1 is no longer necessary. The service stays one
+> entity; the endpoints underneath are where feature-level signal
+> lives.
 
-Next: [Rung 3 - Namespace is a dimension](03-namespace-is-a-dimension.md).
+Next: [Rung 3 - Kafka is a peer endpoint](03-namespace-is-a-dimension.md).

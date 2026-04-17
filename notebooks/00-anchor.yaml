@@ -1,0 +1,99 @@
+name: "orders-demo / 00 - Anchor: What SDv1 shows"
+type: notebook
+content:
+  defaultTimeframe:
+    from: now()-2h
+    to: now()
+  sections:
+    - id: 00000000-0000-0000-0000-000000000001
+      type: markdown
+      markdown: |-
+        # Anchor: What SDv1 actually shows you
+
+        Before we introduce anything new, look at what the tenant shows for the
+        `orders-sdv1` namespace on **default SDv1 detection**. No custom rules
+        have been added. This is the starting point for a typical Spring shop.
+
+        The cells below are live queries. Hit **Run** on each and inspect the result.
+    - id: 00000000-0000-0000-0000-000000000002
+      type: markdown
+      markdown: |-
+        ## 1. Count what SDv1 detected
+
+        One Spring Boot JVM was deployed. How many service entities does SDv1
+        produce from it?
+    - id: 00000000-0000-0000-0000-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch dt.entity.service
+            | filter contains(entity.name, "orders-demo") OR contains(entity.name, "OrderEventsListener")
+            | filter serviceType != "UNIFIED"
+            | fields entity.name, serviceType, entity.id
+            | sort serviceType, entity.name
+          timeframe:
+            from: now()-2h
+            to: now()
+        visualization: table
+    - id: 00000000-0000-0000-0000-000000000004
+      type: markdown
+      markdown: |-
+        Expected: a `WEB_REQUEST_SERVICE` plus one `WEB_SERVICE` per controller,
+        plus a `MESSAGING_SERVICE` for the `@KafkaListener`. From one JVM.
+
+        That is the default splitting behavior. No rules were written. Each
+        entity has its own ID, dashboards, alerts, and key-request config.
+
+        ## 2. Peek at endpoint-level visibility on SDv1
+
+        Look at what response-time metrics surface for one of the SDv1 services
+        (the `orders-demo` WEB_REQUEST_SERVICE). Without key-request nomination,
+        individual endpoints are collapsed under `NON_KEY_REQUESTS`:
+    - id: 00000000-0000-0000-0000-000000000005
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries {
+              avg_rt = avg(dt.service.request.response_time),
+              count = sum(dt.service.request.count)
+            },
+            by: { dt.entity.service, endpoint.name },
+            from: now()-2h
+            | lookup [fetch dt.entity.service | fields id, entity.name], sourceField: dt.entity.service, lookupField: id, prefix: "svc."
+            | filter contains(svc.entity.name, "orders-demo") OR contains(svc.entity.name, "OrderEventsListener")
+            | fields svc.entity.name, endpoint.name, avg_rt, count
+          timeframe:
+            from: now()-2h
+            to: now()
+        visualization: table
+    - id: 00000000-0000-0000-0000-000000000006
+      type: markdown
+      markdown: |-
+        Notice `endpoint.name = NON_KEY_REQUESTS` for the SDv1 web service.
+        This is exactly why customers nominate key requests: to break that
+        lump into named endpoints with their own baselines.
+
+        ## 3. What customers build on top
+
+        To make SDv1 useful for a team, customers typically add:
+
+        | Config surface | Typical count for a 3-controller Spring app |
+        |---|---|
+        | Service-naming rules | 3 to 5 |
+        | Custom splitting rules | 0 to 3 |
+        | Key requests | 5 to 10 |
+        | Tagging rules per team | 1 to 3 |
+        | Host-group splits per environment | x N |
+
+        All of it load-bearing. None of it visible from the app code.
+
+        ## What you now know
+
+        > SDv1 default detection fragments a single JVM into multiple service
+        > entities. Each controller is a separate service, each Kafka listener
+        > is a separate service, and every additional namespace multiplies
+        > everything. Custom rules extend this model, they do not replace it.
+
+        Next notebook: **01 - One unified service identity**

@@ -1,85 +1,81 @@
 ---
-title: Rung 3 - Namespace is a dimension, not a service split
-description: One new idea built on Rungs 1-2. Deployment context (namespace, cluster, version) is a metric dimension on one service identity, not a reason to split into multiple services.
+title: Rung 3 - Kafka is a peer endpoint
+description: The @KafkaListener is an endpoint of the UNIFIED service, not a separate entity. Messaging gets its own metric family but shares identity and transaction semantics.
 rung: 3
 last_updated: 2026-04-17
 ---
 
-# Rung 3: Namespace is a dimension, not a service split
+# Rung 3: Kafka is a peer endpoint
 
-Recap of Rungs 1-2: endpoints are the unit of health, and Kafka
-consumers are peers of HTTP endpoints.
+Recap of Rungs 1-2: one UNIFIED service per workload, and endpoints
+carry baselines directly. So far we have mostly talked about HTTP.
 
 ## The new idea
 
-> In SDv2, **deployment context** (namespace, cluster, version) is a
-> metric dimension on **one** service identity. You slice charts by
-> namespace, you do not split into new services.
+> The `@KafkaListener` is an **endpoint** on the same UNIFIED service
+> as the HTTP controllers. Not a separate service entity. Different
+> metric family underneath, shared identity above.
 
-To see this, deploy the same app into a second SDv2 namespace.
+## Compare the two sides
 
-## Apply the staging namespace
+Under `orders-sdv1`, the Kafka consumer shows up as a **separate
+service entity**: `OrderEventsListener` (type `MESSAGING_SERVICE`).
+That entity has its own ID, its own entry in dashboards, its own
+alerts. If you want to ask "how healthy is the Spring app overall",
+you join it with the HTTP services yourself.
 
-This rung adds `orders-sdv2-staging`: same image, same Deployment, same
-traffic (at lower rate to represent a staging environment). Same
-`service.name`. Different `k8s.namespace.name`.
+Under `orders-sdv2`, open `orders-sdv2 -- orders-demo` and scroll to
+the Endpoints panel. `order-events` sits there alongside the HTTP
+endpoints. One service. Two transports.
 
-```bash
-kubectl apply -f k8s/50-sdv2-staging.yaml
-```
+## What Kafka-as-endpoint gives you
 
-Wait a few minutes for traffic to flow and the ActiveGate to pick it up.
+Metric-family-wise, the consumer uses `dt.service.messaging.process.*`
+with these dimensions:
 
-## What you should see
+- `messaging.system = kafka`
+- `messaging.destination.name = order-events`
+- `messaging.operation = process`
 
-Go back to **Services** and find `orders-demo`:
+You can chart consumer health by topic without owning a service
+entity per topic. Add a second `@KafkaListener` tomorrow and it
+becomes another endpoint on the same UNIFIED service, not another
+service entity to wire into every dashboard.
 
-- Still **one** service entity. Not two. The `service.name` is the same
-  across both namespaces, so SDv2 treats them as one logical service.
-- Two **SERVICE_DEPLOYMENT** entities hanging off it: one for
-  `orders-sdv2` (namespace = `orders-sdv2`) and one for
-  `orders-sdv2-staging` (namespace = `orders-sdv2-staging`).
-- Endpoints still have one row each, but the charts can be **split by
-  `k8s.namespace.name`**. Open the response-time chart on `POST /orders/submit`,
-  click the split-by control, pick `k8s.namespace.name`. Two series. Same
-  endpoint. Different deployment contexts.
+On the overview, the consumer throughput and failure rate are
+**coalesced into the service's Transactions number** alongside the
+HTTP endpoints. One service health view. Per-transport drilldown
+underneath.
 
-This is the Datadog unified-service-tagging shape (`service`, `env`,
-`version`) expressed in Dynatrace's entity model:
+## The unified failure indicator (preview of Rung 4)
 
-| Datadog tag | Dynatrace equivalent here |
-|---|---|
-| `service` | `service.name` = `orders-demo` |
-| `env` | `k8s.namespace.name` (we use namespace as env proxy) |
-| `version` | `service.version` (not demonstrated here - would be a pod annotation) |
+Notice `transaction.is_failed` as a span attribute on both HTTP
+and messaging spans. SDv1 had separate indicators:
+`request.is_failed` for HTTP, implicit for messaging. SDv2 unifies
+them. Rung 4 uses this when we trace a bad order end to end.
 
-## Compare to `orders-sdv1`
+## Counter-example from SDv1
 
-On the SDv1 side, if we had deployed this app to a second namespace
-under SDv1 detection, we would have seen a second service entity, with
-its own baselines, its own dashboards, its own key requests. Two
-services, same code, different infra. That is the fragmentation that
-pushed teams to manual unified-service-tagging hacks.
+Start at `OrderEventsListener` in the SDv1 side. Click around. You
+will find:
 
-SDv2's SERVICE_DEPLOYMENT avoids the fragmentation without losing
-per-environment visibility. One identity. Dimensional slicing for views.
+- Its response-time and failure-rate charts are in the standalone
+  service view, not in the `orders-demo` overview.
+- Alerts filed on its failures do not share configuration with
+  alerts on HTTP endpoints. A team that cares about end-to-end
+  health maintains two sets.
+- Failure analysis from an HTTP entry does not follow cleanly into
+  it, because the service identity changes at the Kafka hop.
 
-## Why this matters for splitting rules
-
-In the anchor, one of the SDv1 configuration burdens was host-group
-splits: the same binary in dev and prod became two services, sometimes
-three. Teams lived with it because they needed per-environment health.
-
-With SERVICE_DEPLOYMENT, you get per-environment health through a
-dimension, not through splitting. The splitting rules are not
-necessary anymore. Mike's stated direction is to reduce reliance on
-splitting in favor of this dimensional slicing.
+SDv2 removes the boundary. Same service. Different transport.
+Consistent modeling.
 
 ## What you now know
 
-> One service identity, many deployment contexts. Per-environment
-> health is a chart split, not an entity split. The instinct to make a
-> new service for every infra boundary is the SDv1 instinct; you do not
-> need it here.
+> In SDv2 the `@KafkaListener` is an endpoint of the same service as
+> the HTTP controllers. Messaging gets a dedicated metric family,
+> but identity and transaction semantics are shared across
+> transports. You stop managing the Kafka consumer as a separate
+> thing to observe.
 
 Next: [Rung 4 - Failure crosses the seam](04-failure-crosses-the-seam.md).

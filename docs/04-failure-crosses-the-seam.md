@@ -1,126 +1,138 @@
 ---
 title: Rung 4 - Failure crosses the seam
-description: One new idea built on Rungs 1-3. Failure analysis follows a transaction from HTTP through the Kafka hop to the consumer, as one continuous signal, via unified transaction.is_failed semantics.
+description: Failure analysis follows a transaction across the HTTP-to-Kafka boundary as one continuous signal, because both sides share identity under SDv2.
 rung: 4
 last_updated: 2026-04-17
 ---
 
 # Rung 4: Failure crosses the seam
 
-Recap of Rungs 1-3: endpoints carry baselines, messaging is a peer of
-HTTP, namespace is a dimension. Each rung was about a single service
-identity in steady state.
+Recap of Rungs 1-3: one UNIFIED service per workload, endpoints are
+the unit of health, and Kafka is a peer endpoint alongside HTTP.
 
-This rung is about what happens when things break across the HTTP /
-Kafka boundary.
+Each rung so far described a single service in steady state. This
+rung is about what happens when things break across the
+HTTP-to-Kafka boundary.
 
 ## The new idea
 
 > In SDv2, failure analysis follows a transaction across the
-> HTTP-to-messaging seam. The unified `transaction.is_failed` attribute
-> collapses HTTP failure, messaging failure, and downstream exception
-> into one signal you can chart, alert on, and trace.
+> HTTP-to-messaging seam. The unified `transaction.is_failed`
+> attribute collapses HTTP failure, messaging failure, and
+> downstream exceptions into one signal, chartable and alertable.
 
-## Set up the observation
+## How the demo exercises this
 
-The load generator sends a small fraction of orders with a seeded
-`bad: true` flag. The HTTP call to `POST /orders/submit` succeeds:
-the order is persisted, a Kafka message is produced, and the caller
-gets a 201. The **consumer** then reads the message, sees the bad
-flag, and throws. The database rollback leaves the order in
-`PENDING`. That is the seam.
+The load generator sends 2% of `POST /orders/submit` requests with a
+seeded `bad: true` flag. The HTTP handler:
 
-## What you should see
+1. Persists the order with status `PENDING`.
+2. Produces a Kafka message to `order-events` with the bad flag
+   passed through.
+3. Returns 201 to the caller.
 
-In the **Services** app, under `orders-demo` in `orders-sdv2`:
+The `@KafkaListener` then:
 
-1. Open the endpoint `POST /orders/submit`. Failure rate chart: likely
-   flat at zero or near zero. The HTTP call itself succeeded.
-2. Open the endpoint `order-events` (messaging). Failure rate chart:
-   ~2%. The consumer rejected the bad payloads.
-3. Click into a failed consumer invocation. In the trace view you
-   should see:
-   - The HTTP span on `POST /orders/submit` (from replica A).
-   - The Kafka producer span on the same service.
-   - The Kafka consumer span (possibly on replica B).
-   - The Hibernate/JDBC spans against Postgres.
-   - An exception span with the seeded `IllegalStateException`.
+1. Consumes the message.
+2. Sees `bad: true` and throws `IllegalStateException`.
+3. The `@Transactional` rollback leaves the order in `PENDING`.
 
-All in one trace. One continuous signal. No SDv1-era "two disconnected
-services stitched with some correlation luck".
+The HTTP call succeeded. The Kafka consumption failed. That is the
+seam.
+
+## What you should see in the SDv2 side
+
+On `orders-sdv2 -- orders-demo`:
+
+1. **Endpoint `POST /orders/submit`** - failure rate flat at or near
+   zero. The HTTP calls all succeeded.
+2. **Endpoint `order-events`** - failure rate ~2%. The consumer
+   rejected the seeded bad payloads.
+3. **Click into a failed consumer invocation** in the trace view.
+   You should see a single trace with:
+   - HTTP span on `POST /orders/submit` (from pod A).
+   - Kafka producer span on the same service.
+   - Kafka consumer span (possibly on pod B).
+   - Hibernate / JDBC spans on Postgres.
+   - Exception span carrying the seeded `IllegalStateException`.
+
+All attached to one service identity. `transaction.is_failed = true`
+on the consumer span and the exception span; `false` on the HTTP
+span. One unified trace, three different truths about success.
 
 ## Why this works
 
 Three mechanisms stack:
 
-- **One service identity.** Both the HTTP producer and the Kafka
-  consumer are the same `orders-demo` service. The trace does not
-  cross a service boundary; it crosses a transport (HTTP to Kafka to
-  JDBC). Identity stays stable.
-- **Unified `transaction.*` span attributes.** `transaction.is_failed`
-  is the same attribute whether the failure is an HTTP 5xx, a Kafka
-  consumer exception, or a database error. Charts, segments, and alerts
-  that reference it are portable across families.
-- **Context propagation through Kafka headers.** The producer writes
-  W3C `traceparent` to the message headers. The consumer reads it and
-  continues the trace. This is OneAgent / OpenTelemetry default
-  behavior; no app code needed.
+- **Shared identity.** Producer and consumer are the same
+  UNIFIED service. The trace crosses transports (HTTP to Kafka to
+  JDBC) but does not cross a service boundary.
+- **Unified `transaction.*` span attributes.**
+  `transaction.is_failed`, `transaction.is_root_span`, and the
+  workload-type discriminators
+  (`transaction.is_endpoint_request`, `transaction.is_message_processing`,
+  etc.) are the same attribute family for HTTP, messaging, and FaaS.
+  Alerts and charts that reference them are portable across
+  transports.
+- **Kafka header context propagation.** The producer writes W3C
+  `traceparent` to Kafka headers. The consumer reads it and
+  continues the trace. OneAgent does this automatically; no app
+  code needed.
 
 ## Compare to `orders-sdv1`
 
-On the SDv1 side, the comparable trace usually breaks. Typical failure
-modes:
+On the SDv1 side, the same load pattern breaks observability at the
+Kafka hop:
 
-- The Kafka consumer appears on a different service (host-group split,
-  or process-group variance) and the trace is not stitched.
-- Failure analysis on the HTTP endpoint reports success (it was a 201)
-  and the consumer exception shows up separately, with no obvious link
-  back to the originating request.
-- `request.is_failed` vs `messaging.is_failed` vs exception spans use
-  different attributes. Alerts need to OR them together. Charts do
-  not coalesce.
+- `orders-demo - OrderController` reports success on `POST /orders/submit`.
+  (Correct.)
+- `OrderEventsListener` reports ~2% failure rate. (Also correct.)
+- **But the two are different service entities.** Failure analysis
+  from the HTTP entry does not reach the consumer automatically.
+  The trace may be stitched through W3C context, but the *service*
+  narrative splits.
+- Alerting needs two rules. Dashboards show two charts.
+- Davis correlates less well because the entities on both sides of
+  the seam do not share identity.
 
-The viewer should literally see the SDv1 side show success on
-`/orders/submit` while the SDv2 side surfaces the consumer failure in
-the same trace. That contrast is the whole rung.
+SDv2 removes the seam. Identity is shared. Failure analysis runs
+end-to-end.
 
 ## Practical consequences
 
-- **One alert can cover the seam.** Alert on
+- **One alert covers the full transaction.** Alert on
   `transaction.is_failed = true` filtered to
-  `service.name = orders-demo` and you catch HTTP, messaging, and
-  downstream failures in one rule.
-- **Failure Analysis is not misled by the seam.** The response-time /
-  failure-count correlations find the true root span because the trace
-  is unbroken.
-- **Refactors do not break this.** If you swap Kafka for RabbitMQ
-  tomorrow, `transaction.is_failed` still works. The messaging family
-  changes underneath.
+  `service.name = orders-sdv2 -- orders-demo` and you catch HTTP,
+  messaging, and downstream failures in one rule.
+- **Failure Analysis identifies the true root.** Because the trace
+  is unbroken and identity is stable, the root span identified is
+  the actual failure (the consumer exception), not the last span
+  before a service boundary.
+- **Transport swaps are cheap.** Swap Kafka for RabbitMQ and
+  `transaction.is_failed` still works. The metric family changes
+  underneath; the failure model does not.
 
 ## What you now know
 
 > The HTTP-to-Kafka seam is no longer an observability boundary in
-> SDv2. Failure is one unified signal across transports, because the
-> service identity and the transaction semantics are stable across
-> them.
+> SDv2. Service identity is shared across transports, the
+> `transaction.*` attributes unify failure semantics, and OneAgent
+> propagates context through Kafka headers automatically. You
+> observe the whole flow as one.
 
 ## Where to go from here
 
 You have walked the ladder:
 
-1. Endpoints carry baselines.
-2. Messaging is a peer of HTTP.
-3. Namespace is a dimension.
+1. One UNIFIED service identity per workload.
+2. Endpoints carry baselines.
+3. Kafka is a peer endpoint.
 4. Failure crosses the seam.
 
-None of these required splitting rules, naming rules, key requests,
-or custom services. That is the point.
+None of this required splitting rules, naming rules, key requests,
+or custom service entities for the messaging side. That is the
+point.
 
-Appendix topics we deliberately did not teach here (parked for when a
-customer asks):
-
-- `@Scheduled` and `@Async`: how SDv2 treats background Spring work.
-- `faas_invoke.*` family: Lambda triggers, the third metric family.
-- Webhook endpoints: distinct baselining for inbound third-party calls.
-- `service.version` and release-stage as additional dimensions.
-- Enhanced endpoints vs classic key requests in Phase 3 migration.
+See [05-roadmap.md](05-roadmap.md) for where SDv2 is headed after
+preview (splitting-rule deprecation, SERVICE_DEPLOYMENT,
+dimensional slicing).

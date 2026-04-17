@@ -1,80 +1,84 @@
 ---
-title: Rung 1 - Endpoints are the unit of health
-description: One new idea built on the anchor. Endpoints carry baselines directly; you no longer manufacture services to get per-feature health.
+title: Rung 1 - One unified service identity
+description: The first thing SDv2 changes - several SDv1 service entities collapse into one UNIFIED service per (namespace, workload). Anchored on stable k8s resource attributes.
 rung: 1
 last_updated: 2026-04-17
 ---
 
-# Rung 1: Endpoints are the unit of health
+# Rung 1: One unified service identity
 
-Recap of the anchor: in SDv1 you manufactured services to get per-feature
-health, because services were the only entity with baselines. That is the
-cost you accepted.
+Recap of the anchor: in SDv1, the `orders-sdv1` namespace shows several
+service entities (a WEB_REQUEST_SERVICE, one WEB_SERVICE per controller,
+a separate MESSAGING_SERVICE for the Kafka listener). All from one JVM.
 
 ## The new idea
 
-> In SDv2, **endpoints** carry baselines directly. You no longer need a
-> separate service entity per controller or per URL prefix.
-
-Same Spring app, same image. Different namespace. Same traffic.
+> In SDv2, those fragments collapse into **one UNIFIED service** per
+> (namespace, workload). The service identity is derived from k8s
+> resource attributes, not from process-group fingerprint.
 
 ## Open the `orders-sdv2` namespace in Dynatrace
 
-Under **Services**, filter to `orders-sdv2`. You should see:
+Filter **Services** to the `orders-sdv2` namespace. You should see
+one service:
 
-- **One service**, named `orders-demo`. Not `orders-demo:8080`, not
-  `orders-demo /orders`. Just `orders-demo`. The name comes from
-  `k8s.workload.name`, which is the Deployment name.
-- Two replicas. Those replicas do not fragment the service. The service is
-  the deployment, not the process.
-- An **Endpoints** panel with three entries:
-  - `POST /orders/submit`
-  - `GET /orders/search`
-  - `GET /inventory/check`
-- Click any of them. Each has its own baseline: response time, failure rate,
-  throughput. No configuration. No key requests.
+- **Name:** `orders-sdv2 -- orders-demo`
+- **Type:** `UNIFIED` (new entity type introduced with SDv2)
+- **Detection:** OneAgent + SDv2
 
-## Compare to `orders-sdv1`
+The name is produced by the built-in SDv2 detection rule
+`{k8s.namespace.name} -- {k8s.workload.name}`, and identity is tied to
+`k8s.cluster.uid`, `k8s.namespace.name`, and `k8s.workload.name`.
 
-Go back to the SDv1 namespace and look at `/orders/search`. You cannot
-see its response-time baseline directly. The service-level baseline is an
-average of `/orders/search` (often slow, with a long tail), `/orders/submit`
-(tight envelope), and `/inventory/check` (very fast, very high volume).
-The three latencies wash each other out. An SLO burn on `/orders/submit`
-is invisible at the service level because `/inventory/check` dominates
-the throughput.
+Because the built-in rule `[Built-in] Split services by k8s cluster and
+namespace` is still enabled in the preview, deploying the same
+workload to a second namespace produces a **second** UNIFIED service
+(that is what Rung 3 is about). A single namespace still produces a
+single service.
 
-On the SDv2 side, those three endpoints each have their own chart. The
-`/orders/submit` baseline tightens. The `/orders/search` long tail shows
-up as an independent signal, not smeared into the service average. The
-`/inventory/check` volume no longer drowns anything out.
+## Count what collapsed
 
-## The configuration you did not write
-
-Count back to the anchor:
-
-| Config you wrote in SDv1 | What SDv2 did instead |
+| SDv1 side in `orders-sdv1` | SDv2 side in `orders-sdv2` |
 |---|---|
-| 3 service-detection rules to split the JVM | None. The JVM stays one service. |
-| 3 to 5 naming rules | None. The workload name is the service name. |
-| 5 to 10 key requests | None. All endpoints are baselined. |
-| Ongoing maintenance when controllers are added | None. New endpoints show up automatically. |
+| `orders-demo` (WEB_REQUEST_SERVICE) | `orders-sdv2 -- orders-demo` (UNIFIED) |
+| `orders-demo - OrderController` (WEB_SERVICE) | (folded in) |
+| `orders-demo - InventoryController` (WEB_SERVICE) | (folded in) |
+| `OrderEventsListener` (MESSAGING_SERVICE) | (folded in) |
 
-The configuration is gone because the axis of health moved. Services are
-not where health lives anymore. Endpoints are.
+Four entities became one. The HTTP controllers are no longer separate
+services. The Kafka consumer is no longer a separate service. All of
+them now sit under the single UNIFIED entity and are surfaced as
+**endpoints** of that service (the subject of Rung 2).
 
-## What this unlocks
+## Why this changes how you think
 
-- A Spring team can now file alerts on `POST /orders/submit` latency
-  without inventing a service for it.
-- Adding a new controller adds new endpoints. No splitting rule to update.
-- The service entity stays stable across refactors. Endpoints churn,
-  service identity does not.
+The anchor chapter listed five to ten key-request nominations per split
+service. On the SDv2 side there are no split services to nominate key
+requests on. The service is the deployment; per-feature health lives
+elsewhere.
+
+Two practical consequences visible immediately:
+
+- **Service count goes down.** A Spring monolith that produced six
+  SDv1 services produces one SDv2 service per namespace. Multiply by
+  the number of Spring workloads in a cluster and the reduction in
+  entity count is often 5-10x.
+- **Identity stays stable across refactors.** Adding a new
+  `@RestController` adds a new endpoint on the same service. Under
+  SDv1, it added a new WEB_SERVICE entity and possibly invalidated
+  existing dashboards.
+
+## What you do not see yet
+
+Do not read too much into service-level charts on the SDv2 side until
+at least 15 minutes of traffic has accumulated. Baselines need time
+to form, and the endpoint surface (Rung 2) is worth a separate look.
 
 ## What you now know
 
-> Endpoints are the unit of per-feature health. Services are a higher-level
-> identity that stays stable across endpoint churn. This inverts the SDv1
-> relationship.
+> Under SDv2, a single Spring JVM deployed to a namespace is
+> represented as one UNIFIED service. Controllers and Kafka listeners
+> that used to be separate services are now folded in as endpoints
+> of that service. Identity is k8s-native and stable.
 
-Next: [Rung 2 - Messaging is first-class](02-messaging-is-first-class.md).
+Next: [Rung 2 - Endpoints are the unit of health](02-messaging-is-first-class.md).
