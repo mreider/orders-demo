@@ -1,3 +1,4 @@
+id: 44ee1f18-e69c-4c5d-b3e7-040410e568ae
 name: "orders-demo / 03 - Measuring HTTP health both ways"
 type: notebook
 content:
@@ -40,7 +41,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0003-000000000004
       type: markdown
       markdown: |-
@@ -63,7 +64,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0003-000000000006
       type: markdown
       markdown: |-
@@ -101,7 +102,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0003-000000000008
       type: markdown
       markdown: |-
@@ -125,7 +126,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0003-000000000010
       type: markdown
       markdown: |-
@@ -162,7 +163,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: barChart
     - id: 00000000-0000-0000-0003-000000000012
       type: markdown
       markdown: |-
@@ -184,7 +185,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: barChart
     - id: 00000000-0000-0000-0003-000000000014
       type: markdown
       markdown: |-

@@ -1,0 +1,67 @@
+name: "orders-demo / ZZ - DELETE THESE (dtctl bug, UI cleanup)"
+type: notebook
+content:
+  defaultTimeframe:
+    from: now()-30m
+    to: now()
+  sections:
+    - id: 00000000-0000-0000-dddd-000000000001
+      type: markdown
+      markdown: |-
+        # DELETE THESE (UI cleanup)
+
+        `dtctl 0.24.0 delete notebook <id>` returns `access denied to
+        document` for every notebook on this tenant, including ones
+        the same dtctl invocation just created. The delete path needs
+        an OAuth scope dtctl isn't asking for. Filed as
+        [dynatrace-oss/dtctl#160](https://github.com/dynatrace-oss/dtctl/issues/160).
+
+        Meanwhile, the notebooks listed below accumulated while
+        iterating on the ladder - earlier versions with wrong naming
+        claims, pre-visualization-variety tables, and scratch tests.
+        Click each link (opens in new tab), verify the ID in the URL
+        matches, and **Delete** via the UI menu.
+
+        Once deleted, this notebook can go too (last entry in the
+        list).
+    - id: 00000000-0000-0000-dddd-000000000002
+      type: markdown
+      markdown: |-
+        ## Orphans to delete
+
+        | Open | What it was | Why stale |
+        |---|---|---|
+        | [orders-demo test](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/d1278c91-4e97-4f59-93db-7347d2b891bb) | Schema-discovery scratch | Left over from first-session exploration |
+        | [01 - Optimally sliced SDv1 (v1)](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/1b53b5ef-1f61-4d02-b024-3fb83804cf38) | First Rung 1 draft | Claimed `http.route` was missing; incorrect |
+        | [02 - Optimally sliced SDv2 (v1)](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/0c16937d-6cd6-424e-b45a-405d6b154041) | First Rung 2 draft | Same wrong naming claim |
+        | [05 - End-to-end failure (v1)](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/29fc78b4-53c7-4f25-9f11-48286bc62fee) | First Rung 5 draft | Double-counted consumer-span failures |
+        | [06 - Where this is going (v1)](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/4dfd619a-d586-44a3-b33a-76e65978940d) | First Rung 6 draft | Wrong `http.route` gap claim |
+        | [viz-test - areaChart + barChart + singleValue](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/d013370e-b5a8-49af-940d-5e592b3934dc) | Viz-type discovery scratch | One-shot probe |
+        | [01 - Optimally sliced SDv1 (v2)](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/0d2cb0c6-dda3-403d-adff-6da888a56037) | Rung 1, pre-charts | Replaced by current version with `lineChart` defaults |
+        | [02 - Optimally sliced SDv2 (v2)](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/89baef47-078d-4aae-bc7e-08cd2ae364fa) | Rung 2, pre-charts | Replaced by `areaChart` + `pieChart` version |
+        | [03 - Measuring HTTP health (v1)](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/65b8531a-9de6-40c9-8ab7-965b0d42b37d) | Rung 3, pre-charts | Replaced by `barChart` top-N version |
+        | [04 - Measuring messaging health (v1)](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/38cf95df-c396-4215-a8e4-ff99ff10363f) | Rung 4, pre-charts | Replaced by `lineChart` version |
+        | [05 - End-to-end failure (v2)](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/d751e95e-5956-4703-9f94-8ea5c99dc863) | Rung 5, pre-charts | Replaced by `areaChart` composite + `barChart` span rollup |
+        | [06 - Where this is going (v2)](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/cf8ef21e-2f4c-48c2-940e-23f225acad04) | Rung 6, pre-charts | Replaced by `areaChart` endpoints version |
+        | [HOME - ladder (v1)](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/b2d687bd-5cda-4936-90e2-addc98f5136a) | First HOME | Stale URLs (points at the v1/v2 notebooks above) |
+    - id: 00000000-0000-0000-dddd-000000000003
+      type: markdown
+      markdown: |-
+        ## Keep these (current ladder)
+
+        For contrast and verification:
+
+        | Rung | Current ID | Link |
+        |---|---|---|
+        | HOME | `c2a2885e-1da9-4c4b-80fa-ebdda5d42f2c` | [Open](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/c2a2885e-1da9-4c4b-80fa-ebdda5d42f2c) |
+        | 00 Anchor | `fc559cb4-56b3-4a47-bb96-e405e632f4b6` | [Open](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/fc559cb4-56b3-4a47-bb96-e405e632f4b6) |
+        | 01 Optimally sliced SDv1 | `6067564b-95e5-4734-9cd5-b1de50af07e8` | [Open](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/6067564b-95e5-4734-9cd5-b1de50af07e8) |
+        | 02 Optimally sliced SDv2 | `aed7e9c5-2d64-4dba-b2a1-1ab40655d92c` | [Open](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/aed7e9c5-2d64-4dba-b2a1-1ab40655d92c) |
+        | 03 HTTP health both ways | `44ee1f18-e69c-4c5d-b3e7-040410e568ae` | [Open](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/44ee1f18-e69c-4c5d-b3e7-040410e568ae) |
+        | 04 Messaging health both ways | `e19926bf-7f6f-4af6-b5c5-c4b8502549c0` | [Open](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/e19926bf-7f6f-4af6-b5c5-c4b8502549c0) |
+        | 05 End-to-end failure | `f8eb3be6-9fda-4f83-bdd3-c8d14409c490` | [Open](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/f8eb3be6-9fda-4f83-bdd3-c8d14409c490) |
+        | 06 Where this is going | `1df0ab23-5384-4c5a-ba73-5237d527a6f6` | [Open](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/1df0ab23-5384-4c5a-ba73-5237d527a6f6) |
+
+        Edits from here on are in-place (`dtctl apply` with an `id:`
+        field at the top of each YAML), so the current IDs stay
+        stable across future iterations. No more duplicate generation.

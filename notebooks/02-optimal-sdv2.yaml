@@ -1,3 +1,4 @@
+id: aed7e9c5-2d64-4dba-b2a1-1ab40655d92c
 name: "orders-demo / 02 - Optimally sliced SDv2 - attribute is the unit"
 type: notebook
 content:
@@ -12,7 +13,18 @@ content:
 
         The anchor showed SDv2 produces one UNIFIED entity for this
         workload. Rung 1 showed SDv1's splits can be refined with
-        enhanced endpoints, but the entity surface stays fragmented.
+        enhanced endpoints, but the entity surface stays fragmented -
+        and those fragments are faux entities: pieces of one deployed
+        workload dressed up as separate services.
+
+        SDv2 right-sizes the concept of service identity to the modern
+        deployment unit. In Kubernetes that is the workload (Deployment,
+        StatefulSet). In Lambda it is the function. In ECS it is the
+        task. One runnable unit, one team, one service. Controllers and
+        listeners inside that unit are *internal organization*, not
+        separate services. SDv2 expresses that structurally: one entity
+        per workload, with controllers and destinations as dimension
+        values.
 
         Now look at the SDv2 side. Same JVM, same routes, same Kafka
         listener. One entity. The same axes SDv1 split into entities
@@ -46,7 +58,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: areaChart
     - id: 00000000-0000-0000-0002-000000000004
       type: markdown
       markdown: |-
@@ -98,7 +110,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: pieChart
     - id: 00000000-0000-0000-0002-000000000006
       type: markdown
       markdown: |-
@@ -135,7 +147,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0002-000000000008
       type: markdown
       markdown: |-

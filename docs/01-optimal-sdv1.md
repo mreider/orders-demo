@@ -17,6 +17,23 @@ Enabled on this demo via the `builtin:enhanced-endpoints-for-sdv1`
 settings schema, scoped to the `orders-sdv1`
 CLOUD_APPLICATION_NAMESPACE.
 
+## Historical fit
+
+The entity-per-class model was designed for J2EE monoliths: one JVM
+hosting many logically distinct services (EJB session beans, MDBs,
+servlets, JAX-RS resources from multiple WARs), often owned by
+different teams shipping under one EAR. For that shape, a
+WEB_SERVICE per `@Controller` and a MESSAGING_SERVICE per
+`@KafkaListener` surfaced genuinely separate services and earned
+their own dashboards.
+
+For a Spring Boot microservice - one JAR, one team, one deployment
+unit - the same splits produce **faux entities** that fragment what
+is already one service. Rung 1 walks SDv1 *optimally configured* -
+the best version of the entity-per-class model. Whether that
+configuration actually fits a Spring Boot workload is what Rung 2
+takes up.
+
 ## What the entity surface looks like after
 
 The entities themselves do not change. SDv1's controller-splitting

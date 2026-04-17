@@ -1,3 +1,4 @@
+id: fc559cb4-56b3-4a47-bb96-e405e632f4b6
 name: "orders-demo / 00 - Anchor: SDv1 splitting vs SDv2 splitting"
 type: notebook
 content:
@@ -71,6 +72,16 @@ content:
 
         > **SDv1 splits on**: class-level boundaries (controller, listener),
         > plus deployment-level boundaries (namespace / host group).
+
+        **These are not four independent services.** They are four
+        *faux entities* representing fragments of one Spring Boot JAR.
+        One team owns the whole workload - not separate controllers.
+        The splitting model comes from an era of J2EE monoliths that
+        genuinely bundled many logically distinct services in one JVM
+        (EJBs, MDBs, servlets from separate WARs). For a Spring Boot
+        microservice, the splits fragment what is already one service.
+        The remaining rungs of the ladder compare this faux-entity
+        view against SDv2's one-identity view.
     - id: 00000000-0000-0000-0000-000000000005
       type: markdown
       markdown: |-

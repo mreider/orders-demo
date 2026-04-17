@@ -1,3 +1,4 @@
+id: e19926bf-7f6f-4af6-b5c5-c4b8502549c0
 name: "orders-demo / 04 - Measuring messaging health both ways"
 type: notebook
 content:
@@ -38,7 +39,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0004-000000000004
       type: markdown
       markdown: |-
@@ -59,7 +60,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0004-000000000006
       type: markdown
       markdown: |-
@@ -94,7 +95,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0004-000000000008
       type: dql
       state:
@@ -113,7 +114,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0004-000000000009
       type: markdown
       markdown: |-
@@ -146,7 +147,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0004-000000000011
       type: markdown
       markdown: |-

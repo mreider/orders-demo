@@ -1,3 +1,4 @@
+id: 6067564b-95e5-4734-9cd5-b1de50af07e8
 name: "orders-demo / 01 - Optimally sliced SDv1 - entity is the unit"
 type: notebook
 content:
@@ -16,6 +17,16 @@ content:
         choice. The endpoint detail inside each split entity is a
         separate axis.
 
+        **Historical fit.** This entity-per-class model was designed
+        for J2EE monoliths: one JVM hosting many logically distinct
+        services (EJB session beans, MDBs, servlets, JAX-RS resources
+        from multiple WARs), often owned by different teams shipping
+        under one EAR. For that shape, a WEB_SERVICE per `@Controller`
+        and a MESSAGING_SERVICE per `@KafkaListener` surfaced genuinely
+        separate services. For a Spring Boot microservice - one JAR,
+        one team, one deployment unit - the same splits produce **faux
+        entities** that fragment what is really one service.
+
         **Enhanced endpoints** flips `NON_KEY_REQUESTS` into per-method
         endpoints inside each WEB_SERVICE entity. It was turned on for
         the `orders-sdv1` namespace via
@@ -23,7 +34,10 @@ content:
         `CLOUD_APPLICATION_NAMESPACE` for `orders-sdv1`).
 
         The splits themselves do not change. What changes is what lives
-        *inside* each split.
+        *inside* each split. We are looking at SDv1 *optimally*
+        configured - the best version of the entity-per-class model.
+        Whether that configuration *fits* the workload is the subject
+        of Rung 2.
     - id: 00000000-0000-0000-0001-000000000002
       type: markdown
       markdown: |-
@@ -49,7 +63,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0001-000000000004
       type: markdown
       markdown: |-
@@ -97,7 +111,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0001-000000000006
       type: markdown
       markdown: |-

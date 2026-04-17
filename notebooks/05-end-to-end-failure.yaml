@@ -1,3 +1,4 @@
+id: f8eb3be6-9fda-4f83-bdd3-c8d14409c490
 name: "orders-demo / 05 - Measuring end-to-end failure both ways"
 type: notebook
 content:
@@ -57,7 +58,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0005-000000000004
       type: markdown
       markdown: |-
@@ -90,7 +91,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0005-000000000006
       type: markdown
       markdown: |-
@@ -126,7 +127,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0005-000000000008
       type: markdown
       markdown: |-
@@ -167,7 +168,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: lineChart
+        visualization: areaChart
     - id: 00000000-0000-0000-0005-000000000010
       type: markdown
       markdown: |-
@@ -213,7 +214,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: barChart
     - id: 00000000-0000-0000-0005-000000000012
       type: markdown
       markdown: |-

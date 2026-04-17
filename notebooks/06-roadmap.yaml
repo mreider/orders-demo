@@ -1,3 +1,4 @@
+id: 1df0ab23-5384-4c5a-ba73-5237d527a6f6
 name: "orders-demo / 06 - Where this is going"
 type: notebook
 content:
@@ -45,7 +46,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: areaChart
     - id: 00000000-0000-0000-0006-000000000004
       type: markdown
       markdown: |-
@@ -90,7 +91,7 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: lineChart
     - id: 00000000-0000-0000-0006-000000000006
       type: markdown
       markdown: |-

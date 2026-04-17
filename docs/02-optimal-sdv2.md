@@ -12,6 +12,21 @@ enabled. No configuration. No key-request nominations. No naming rules.
 No enhanced-endpoints opt-in (SDv2 has no such concept; endpoints are
 native).
 
+## Right-sizing identity
+
+SDv2 aligns service identity with the modern deployment unit. In
+Kubernetes that is the workload (Deployment, StatefulSet). In Lambda
+it is the function. In ECS it is the task. One runnable unit, one
+team, one service. Controllers and listeners inside that unit are
+*internal organization* of one service, not separate services - and
+SDv2 expresses that structurally: one entity per workload, with
+controllers and destinations as dimension values.
+
+This is the structural correction for the faux-entity problem Rung 0
+described. Under SDv1, splits produce multiple entities from a
+workload that is conceptually one service. Under SDv2, the entity is
+the workload; the former split axes become dimensions.
+
 ## What the entity surface looks like
 
 One row:

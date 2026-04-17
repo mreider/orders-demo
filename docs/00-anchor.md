@@ -26,6 +26,25 @@ Four entities from one deployment. Each has its own ID, dashboards,
 alerts, and configuration surface. Deploy the same workload to a
 second namespace and the count doubles.
 
+## These are not four independent services
+
+One team owns the whole Spring Boot JAR. Not separate controllers.
+What SDv1 exposes as four entities are really four *faux entities*
+representing fragments of one deployed workload.
+
+The splitting model comes from an earlier era. J2EE monoliths on
+WebSphere and WebLogic genuinely hosted many logically distinct
+services in one JVM: EJB session beans, message-driven beans,
+servlets and JAX-RS resources from multiple WARs, often owned by
+different teams shipping under a single EAR. Splitting by class
+surfaced those real separations as observable entities. For that
+shape, the model fit.
+
+For a Spring Boot microservice - one runnable JAR, one team, one
+deployment unit - the same splits fragment what is already one
+service. Teams end up rebuilding dashboards to aggregate the faux
+entities back together.
+
 ## What endpoint-level visibility looks like
 
 Inside each WEB_SERVICE, individual routes are invisible until
