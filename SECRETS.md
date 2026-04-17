@@ -13,7 +13,7 @@ repo's **Settings → Secrets and variables → Actions**, or via `gh secret set
 |---|---|---|
 | `GCP_PROJECT_ID` | GCP project that owns the GKE cluster and Artifact Registry | all workflows |
 | `GCP_SA_KEY` | JSON key for a service account with the roles below | all workflows |
-| `DT_TENANT_ID` | Dynatrace tenant short ID (e.g. `abc12345`) | cluster-up |
+| `DT_API_URL` | Full API URL, e.g. `https://abc12345.live.dynatrace.com/api` or `https://abc12345.dev.dynatracelabs.com/api` | cluster-up |
 | `DT_API_TOKEN` | API token with operator scopes | cluster-up |
 | `DT_DATA_INGEST_TOKEN` | Token with `metrics.ingest` + `openTelemetryTrace.ingest` | cluster-up |
 
@@ -62,7 +62,7 @@ Tenant ID is the subdomain of your live URL: `https://abc12345.live.dynatrace.co
 ```bash
 gh secret set GCP_PROJECT_ID --repo mreider/orders-demo --body "dynatrace-dev-on-demand"
 gh secret set GCP_SA_KEY --repo mreider/orders-demo < /tmp/orders-demo-ci.json
-gh secret set DT_TENANT_ID --repo mreider/orders-demo --body "abc12345"
+gh secret set DT_API_URL --repo mreider/orders-demo --body "https://abc12345.live.dynatrace.com/api"
 gh secret set DT_API_TOKEN --repo mreider/orders-demo --body "<the-api-token-value>"
 gh secret set DT_DATA_INGEST_TOKEN --repo mreider/orders-demo --body "<the-data-ingest-value>"
 ```

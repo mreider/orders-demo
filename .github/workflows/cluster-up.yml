@@ -25,7 +25,7 @@ jobs:
       GKE_ZONE: ${{ inputs.zone }}
       GKE_REGION: us-central1
       AR_REPO: ${{ inputs.ar_repo }}
-      DT_TENANT_ID: ${{ secrets.DT_TENANT_ID }}
+      DT_API_URL: ${{ secrets.DT_API_URL }}
       DT_API_TOKEN: ${{ secrets.DT_API_TOKEN }}
       DT_DATA_INGEST_TOKEN: ${{ secrets.DT_DATA_INGEST_TOKEN }}
     steps:
@@ -91,7 +91,7 @@ jobs:
 
       - name: Apply DynaKube
         run: |
-          sed "s|<YOUR_TENANT_ID>|${DT_TENANT_ID}|g" dynatrace/dynakube.yaml | kubectl apply -f -
+          sed "s|<DT_API_URL>|${DT_API_URL}|g" dynatrace/dynakube.yaml | kubectl apply -f -
 
       - name: Summary
         run: |

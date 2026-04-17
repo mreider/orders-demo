@@ -2,7 +2,7 @@
 # Bring up the orders-demo on GKE end to end.
 #
 # Required env vars:
-#   DT_TENANT_ID           Dynatrace tenant (e.g. abc12345)
+#   DT_API_URL             Full API URL, e.g. https://abc.live.dynatrace.com/api
 #   DT_API_TOKEN           API token with operator scopes
 #   DT_DATA_INGEST_TOKEN   Token with metrics.ingest + openTelemetryTrace.ingest
 #
@@ -16,14 +16,15 @@
 #   OPERATOR_VERSION       (resolved from GitHub latest release)
 #
 # Usage:
-#   DT_TENANT_ID=abc12345 DT_API_TOKEN=... DT_DATA_INGEST_TOKEN=... ./scripts/up.sh
+#   DT_API_URL=https://abc.live.dynatrace.com/api \
+#   DT_API_TOKEN=... DT_DATA_INGEST_TOKEN=... ./scripts/up.sh
 
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 
-: "${DT_TENANT_ID:?DT_TENANT_ID is required}"
+: "${DT_API_URL:?DT_API_URL is required}"
 : "${DT_API_TOKEN:?DT_API_TOKEN is required}"
 : "${DT_DATA_INGEST_TOKEN:?DT_DATA_INGEST_TOKEN is required}"
 
@@ -97,8 +98,7 @@ kubectl -n dynatrace create secret generic dynakube \
   --dry-run=client -o yaml | kubectl apply -f -
 
 log "Applying DynaKube"
-export DT_TENANT_ID
-envsubst < "${ROOT}/dynatrace/dynakube.yaml" | sed "s|<YOUR_TENANT_ID>|${DT_TENANT_ID}|g" | kubectl apply -f -
+sed "s|<DT_API_URL>|${DT_API_URL}|g" "${ROOT}/dynatrace/dynakube.yaml" | kubectl apply -f -
 
 # ---- 7. namespaces + infra + app ----
 log "Applying namespaces and infra"
