@@ -1,21 +1,15 @@
 # k6 load generator: identical Job in each namespace.
-# Script is mounted from a ConfigMap built from load/loadtest.js by scripts/up.sh.
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: loadtest-script
-  namespace: orders-sdv1
-data:
-  loadtest.js: |
-    # populated by scripts/up.sh (kubectl create configmap --from-file)
----
+#
+# The loadtest-script ConfigMap is NOT declared here on purpose - it is
+# created at apply-time from load/loadtest.js by scripts/up.sh and by the
+# deploy workflow (so the script lives in one place: load/loadtest.js).
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: loadgen
   namespace: orders-sdv1
 spec:
-  backoffLimit: 1
+  backoffLimit: 3
   template:
     metadata:
       labels:
@@ -42,22 +36,13 @@ spec:
           configMap:
             name: loadtest-script
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: loadtest-script
-  namespace: orders-sdv2
-data:
-  loadtest.js: |
-    # populated by scripts/up.sh (kubectl create configmap --from-file)
----
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: loadgen
   namespace: orders-sdv2
 spec:
-  backoffLimit: 1
+  backoffLimit: 3
   template:
     metadata:
       labels:
