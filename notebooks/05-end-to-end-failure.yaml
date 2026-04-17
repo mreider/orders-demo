@@ -1,0 +1,241 @@
+name: "orders-demo / 05 - Measuring end-to-end failure both ways"
+type: notebook
+content:
+  defaultTimeframe:
+    from: now()-30m
+    to: now()
+  sections:
+    - id: 00000000-0000-0000-0005-000000000001
+      type: markdown
+      markdown: |-
+        # Rung 5: Measuring end-to-end failure both ways
+
+        The load generator seeds 2% of `POST /orders/submit` requests
+        with `bad: true`. HTTP returns 201 successfully. The Kafka
+        consumer reads the message, sees the flag, throws
+        `IllegalStateException`, and the `@Transactional` rollback
+        leaves the order `PENDING`.
+
+        HTTP succeeded. Messaging failed. Same transaction. That is the
+        seam. The question: how does each detection model let you see
+        the end-to-end failure as one signal?
+    - id: 00000000-0000-0000-0005-000000000002
+      type: markdown
+      markdown: |-
+        ## Shared foundation: trace continuity is equivalent
+
+        Before comparing metrics: trace continuity is independent of
+        detection model. OneAgent propagates W3C `traceparent` through
+        Kafka headers on both sides. Open any bad-message trace and
+        you see HTTP span -> Kafka producer span -> Kafka consumer span
+        -> JDBC spans -> exception span, unbroken.
+
+        What differs is the *service-identity* continuity. That is
+        where SDv1's splits cost you.
+
+        ## Question 1: HTTP-side failure on `/orders/submit` - both ways
+    - id: 00000000-0000-0000-0005-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries {
+              cnt    = sum(dt.service.request.count),
+              failed = sum(dt.service.request.failure_count)
+            },
+            by: { dt.entity.service, endpoint.name },
+            from: now()-30m
+            | lookup [fetch dt.entity.service | fields id, entity.name, serviceType],
+                sourceField: dt.entity.service, lookupField: id, prefix: "svc."
+            | filter (svc.entity.name == "orders-demo - OrderController"
+                      AND endpoint.name == "submit")
+                OR (svc.entity.name == "orders-sdv2 -- orders-demo"
+                      AND endpoint.name == "OrderController.submit")
+            | fieldsAdd side = if(svc.serviceType == "UNIFIED", "SDv2", else: "SDv1")
+            | fields side, svc.entity.name, endpoint.name, cnt, failed
+            | sort side asc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+    - id: 00000000-0000-0000-0005-000000000004
+      type: markdown
+      markdown: |-
+        **Result reading:** Both sides show low/zero HTTP failure on
+        `submit`. The HTTP call succeeded - the order was persisted and
+        201 returned. The bad flag rides along in the message payload.
+
+        Both detection models report this correctly. The HTTP entry is
+        healthy from an HTTP perspective.
+
+        ## Question 2: Kafka-side failure on `order-events` - both ways
+    - id: 00000000-0000-0000-0005-000000000005
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries {
+              cnt    = sum(dt.service.messaging.process.count),
+              failed = sum(dt.service.messaging.process.failure_count)
+            },
+            by: { dt.entity.service, messaging.destination.name },
+            from: now()-30m
+            | lookup [fetch dt.entity.service | fields id, entity.name, serviceType],
+                sourceField: dt.entity.service, lookupField: id, prefix: "svc."
+            | filter (svc.entity.name == "OrderEventsListener")
+                OR (svc.entity.name == "orders-sdv2 -- orders-demo")
+            | fieldsAdd side = if(svc.serviceType == "UNIFIED", "SDv2", else: "SDv1")
+            | fields side, svc.entity.name, messaging.destination.name, cnt, failed
+            | sort side asc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+    - id: 00000000-0000-0000-0005-000000000006
+      type: markdown
+      markdown: |-
+        **Result reading:** The failure pulse shows up on both. On SDv1
+        it sits on `OrderEventsListener` (MESSAGING_SERVICE). On SDv2 it
+        sits on `orders-sdv2 -- orders-demo` (UNIFIED). Same failure
+        count, same pulse - different owner.
+
+        ## Question 3: Total transaction-level failure - **the divergence**
+
+        This is where the idioms separate.
+
+        **SDv1 end-to-end answer:** SDv1 wants you to read failures
+        across TWO entities and merge them in your head (or in a
+        multi-series chart). There is no single number.
+    - id: 00000000-0000-0000-0005-000000000007
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries {
+              http_failed = sum(dt.service.request.failure_count),
+              msg_failed  = sum(dt.service.messaging.process.failure_count)
+            },
+            by: { dt.entity.service },
+            from: now()-30m
+            | lookup [fetch dt.entity.service | fields id, entity.name, serviceType],
+                sourceField: dt.entity.service, lookupField: id, prefix: "svc."
+            | filter svc.entity.name == "orders-demo - OrderController"
+                OR svc.entity.name == "OrderEventsListener"
+            | fields svc.entity.name, svc.serviceType, http_failed, msg_failed
+            | sort svc.entity.name asc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+    - id: 00000000-0000-0000-0005-000000000008
+      type: markdown
+      markdown: |-
+        **Result reading:** Two rows (one per entity), each owning only
+        part of the transaction's failure signal. The HTTP side shows
+        zero, the messaging side shows the pulse. To get a
+        "transaction failed" count, a human or a post-processing query
+        has to sum across entities.
+
+        One alert on `orders-demo - OrderController` misses the
+        messaging failures. One alert on `OrderEventsListener` misses
+        the HTTP ones. An end-to-end SLO needs two rules plus a
+        correlation scheme.
+
+        > **SDv1's splits fragment failure ownership.** End-to-end
+        > failure is not natively observable; it has to be
+        > reconstructed from the entities the splits created.
+
+        **SDv2 end-to-end answer:** one identity owns both transports.
+        Sum failure counts across metric families on the one service.
+    - id: 00000000-0000-0000-0005-000000000009
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries {
+              http_failed = sum(dt.service.request.failure_count,
+                                filter: { endpoint.name != "order-events process" }),
+              msg_failed  = sum(dt.service.messaging.process.failure_count)
+            },
+            by: { dt.entity.service },
+            from: now()-30m
+            | lookup [fetch dt.entity.service | fields id, entity.name],
+                sourceField: dt.entity.service, lookupField: id, prefix: "svc."
+            | filter svc.entity.name == "orders-sdv2 -- orders-demo"
+            | fieldsAdd total_failed = http_failed[] + msg_failed[]
+            | fields total_failed, http_failed, msg_failed
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+    - id: 00000000-0000-0000-0005-000000000010
+      type: markdown
+      markdown: |-
+        **Result reading:** One row, three series on one identity.
+        `http_failed` stays at zero (the seeded bad requests return 201).
+        `msg_failed` carries the pulse. `total_failed` = their sum is
+        the transaction-level failure signal for this workload.
+
+        Alert on `total_failed > 0` with a single rule. Every failure in
+        the HTTP->Kafka seam flows through it. When tomorrow adds a
+        second listener or a DB side-effect failure, the rule still
+        covers it because the identity is still one.
+
+        > **SDv2's lack-of-split keeps failure ownership on one
+        > identity.** End-to-end failure is a sum across metric
+        > families on the one service. One alert. One SLO.
+
+        **Filter caveat:** the `sum(..., filter: {...})` on
+        `dt.service.request.*` excludes `endpoint.name == "order-events
+        process"`. Today SDv2 detects consumer spans as endpoints *and*
+        writes them into the messaging family, so the same failures
+        appear in both and naive summing double-counts. The endpoint
+        filter removes the duplication. This double-tracking is exactly
+        what Rung 6 describes as being removed from SDv2 - after that
+        ships, the filter becomes unnecessary.
+
+        ## The unified `transaction.is_failed` span attribute
+
+        For span-level analysis, SDv2 additionally provides
+        `transaction.is_failed` - a unified failure indicator across
+        HTTP, messaging, and FaaS transports. Deprecates the older
+        per-transport flags (`request.is_failed`, `messaging.is_failed`).
+    - id: 00000000-0000-0000-0005-000000000011
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch spans, from: now()-30m
+            | filter isNotNull(transaction.is_failed) AND transaction.is_failed == true
+            | filter k8s.namespace.name == "orders-sdv2"
+            | summarize cnt = count(), by: { endpoint.name }
+            | sort cnt desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+    - id: 00000000-0000-0000-0005-000000000012
+      type: markdown
+      markdown: |-
+        **Result reading:** Any span with `transaction.is_failed == true`
+        in the `orders-sdv2` namespace, grouped by endpoint. Messaging
+        endpoint (`order-events process`) dominates because that is
+        where the seeded bad message manifests as an exception.
+
+        The same span attribute works regardless of transport. Alerts
+        and Davis correlations that key off it are portable across HTTP,
+        messaging, and FaaS transparently.
+
+        ## What you now know
+
+        > Trace continuity is the shared foundation; W3C headers carry
+        > context across Kafka on both SDv1 and SDv2. What diverges is
+        > where failure ownership lives.
+        >
+        > SDv1's splits put HTTP and messaging failures on different
+        > entities, so end-to-end failure is reconstructed from
+        > fragments. SDv2's lack-of-split keeps them on one identity,
+        > so end-to-end failure is a sum - or a single filter on
+        > `transaction.is_failed`.
+
+        Next notebook: **06 - Where this is going**.

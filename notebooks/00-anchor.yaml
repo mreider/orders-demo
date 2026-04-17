@@ -1,27 +1,41 @@
-name: "orders-demo / 00 - Anchor: What SDv1 shows"
+name: "orders-demo / 00 - Anchor: SDv1 splitting vs SDv2 splitting"
 type: notebook
 content:
   defaultTimeframe:
-    from: now()-2h
+    from: now()-30m
     to: now()
   sections:
     - id: 00000000-0000-0000-0000-000000000001
       type: markdown
       markdown: |-
-        # Anchor: What SDv1 actually shows you
+        # Anchor: SDv1 splitting vs SDv2 splitting
 
-        Before we introduce anything new, look at what the tenant shows for the
-        `orders-sdv1` namespace on **default SDv1 detection**. No custom rules
-        have been added. This is the starting point for a typical Spring shop.
+        Both namespaces (`orders-sdv1` and `orders-sdv2`) run the same Spring
+        Boot app with two `@RestController`s and one `@KafkaListener`. The
+        only difference between them is which detection model is active.
 
-        The cells below are live queries. Hit **Run** on each and inspect the result.
+        This notebook walks the entity surface each model produces, and
+        names exactly what they split on.
+
+        ## How to read the rest of the ladder
+
+        > **SDv1 splits workloads into multiple service entities.** The unit
+        > of separation is the entity itself. Class-level boundaries
+        > (controller, listener) and deployment boundaries (namespace,
+        > host group) all become distinct entities.
+        >
+        > **SDv2 keeps one service entity per workload.** The unit of
+        > separation is the metric dimension. Class-level boundaries become
+        > values of the `endpoint.name` and `messaging.destination.name`
+        > attributes on a single UNIFIED service.
+
+        Every query in this ladder answers the same pair of questions:
+        1. Where did SDv1 put the split? (which entity owns this data?)
+        2. Where did SDv2 put the split? (which dimension value carries this data?)
     - id: 00000000-0000-0000-0000-000000000002
       type: markdown
       markdown: |-
-        ## 1. Count what SDv1 detected
-
-        One Spring Boot JVM was deployed. How many service entities does SDv1
-        produce from it?
+        ## 1. How many SDv1 entities came from one JVM?
     - id: 00000000-0000-0000-0000-000000000003
       type: dql
       state:
@@ -30,70 +44,95 @@ content:
             fetch dt.entity.service
             | filter contains(entity.name, "orders-demo") OR contains(entity.name, "OrderEventsListener")
             | filter serviceType != "UNIFIED"
-            | fields entity.name, serviceType, entity.id
-            | sort serviceType, entity.name
+            | fields entity.name, serviceType, id
+            | sort serviceType asc, entity.name asc
           timeframe:
-            from: now()-2h
+            from: now()-30m
             to: now()
         visualization: table
     - id: 00000000-0000-0000-0000-000000000004
       type: markdown
       markdown: |-
-        Expected: a `WEB_REQUEST_SERVICE` plus one `WEB_SERVICE` per controller,
-        plus a `MESSAGING_SERVICE` for the `@KafkaListener`. From one JVM.
+        **Result reading:** SDv1 splits one JVM into multiple service
+        entities. Expected rows:
 
-        That is the default splitting behavior. No rules were written. Each
-        entity has its own ID, dashboards, alerts, and key-request config.
+        - `orders-demo` (WEB_REQUEST_SERVICE) - the raw request service
+        - `orders-demo - OrderController` (WEB_SERVICE) - split from the raw
+          request service by the `@Controller` class name
+        - `orders-demo - InventoryController` (WEB_SERVICE) - same rule
+        - `OrderEventsListener` (MESSAGING_SERVICE) - the `@KafkaListener`
+          produces its own messaging entity
 
-        ## 2. Peek at endpoint-level visibility on SDv1
+        Duplicated rows (two `OrderController`, two `InventoryController`,
+        two `OrderEventsListener`) are because the same app runs in both
+        `orders-sdv1` and `orders-sdv2` namespaces. SDv1 splits the service
+        per-host-group/process-group, so each namespace's deployment has
+        its own copy of every WEB_SERVICE / MESSAGING_SERVICE entity.
 
-        Look at what response-time metrics surface for one of the SDv1 services
-        (the `orders-demo` WEB_REQUEST_SERVICE). Without key-request nomination,
-        individual endpoints are collapsed under `NON_KEY_REQUESTS`:
+        > **SDv1 splits on**: class-level boundaries (controller, listener),
+        > plus deployment-level boundaries (namespace / host group).
     - id: 00000000-0000-0000-0000-000000000005
+      type: markdown
+      markdown: |-
+        ## 2. How many SDv2 entities came from the same JVM?
+    - id: 00000000-0000-0000-0000-000000000006
       type: dql
       state:
         input:
           value: |-
-            timeseries {
-              avg_rt = avg(dt.service.request.response_time),
-              count = sum(dt.service.request.count)
-            },
-            by: { dt.entity.service, endpoint.name },
-            from: now()-2h
-            | lookup [fetch dt.entity.service | fields id, entity.name], sourceField: dt.entity.service, lookupField: id, prefix: "svc."
-            | filter contains(svc.entity.name, "orders-demo") OR contains(svc.entity.name, "OrderEventsListener")
-            | fields svc.entity.name, endpoint.name, avg_rt, count
+            fetch dt.entity.service
+            | filter serviceType == "UNIFIED"
+            | filter contains(entity.name, "orders-demo")
+            | fieldsAdd ns = serviceDetectionAttributes[`k8s.namespace.name`],
+                        workload = serviceDetectionAttributes[`k8s.workload.name`],
+                        cluster = serviceDetectionAttributes[`k8s.cluster.uid`]
+            | fields entity.name, ns, workload, cluster, id
           timeframe:
-            from: now()-2h
+            from: now()-30m
             to: now()
         visualization: table
-    - id: 00000000-0000-0000-0000-000000000006
+    - id: 00000000-0000-0000-0000-000000000007
       type: markdown
       markdown: |-
-        Notice `endpoint.name = NON_KEY_REQUESTS` for the SDv1 web service.
-        This is exactly why customers nominate key requests: to break that
-        lump into named endpoints with their own baselines.
+        **Result reading:** One row.
 
-        ## 3. What customers build on top
+        SDv2 splits identity by (`k8s.cluster.uid`, `k8s.namespace.name`,
+        `k8s.workload.name`) only. Controllers and Kafka listeners do NOT
+        produce separate entities; they become dimensions of the single
+        UNIFIED service.
 
-        To make SDv1 useful for a team, customers typically add:
+        > **SDv2 splits on**: deployment-level boundaries only
+        > (cluster / namespace / workload). Class-level boundaries are
+        > delegated to `endpoint.name` and messaging dimensions - inside
+        > the one identity.
 
-        | Config surface | Typical count for a 3-controller Spring app |
-        |---|---|
-        | Service-naming rules | 3 to 5 |
-        | Custom splitting rules | 0 to 3 |
-        | Key requests | 5 to 10 |
-        | Tagging rules per team | 1 to 3 |
-        | Host-group splits per environment | x N |
-
-        All of it load-bearing. None of it visible from the app code.
+        ## 3. Side-by-side counts
+    - id: 00000000-0000-0000-0000-000000000008
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch dt.entity.service
+            | filter contains(entity.name, "orders-demo") OR contains(entity.name, "OrderEventsListener")
+            | fieldsAdd detection = if(serviceType == "UNIFIED", "SDv2", else: "SDv1")
+            | summarize entity_count = count(), example_names = collectArray(entity.name),
+                by: { detection, serviceType }
+            | sort detection asc, serviceType asc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+    - id: 00000000-0000-0000-0000-000000000009
+      type: markdown
+      markdown: |-
+        **Result reading:** From the same JVM, SDv1 produces 7+ entities
+        (2 WEB_REQUEST_SERVICE, 4 WEB_SERVICE, 2 MESSAGING_SERVICE across
+        both namespaces) while SDv2 produces 1. Everything SDv1 achieved
+        by splitting lives in SDv2 as dimensions of that 1 entity.
 
         ## What you now know
 
-        > SDv1 default detection fragments a single JVM into multiple service
-        > entities. Each controller is a separate service, each Kafka listener
-        > is a separate service, and every additional namespace multiplies
-        > everything. Custom rules extend this model, they do not replace it.
+        > SDv1 splits workloads into multiple entities. SDv2 keeps one
+        > entity per workload and splits the same axes as dimensions.
 
-        Next notebook: **01 - One unified service identity**
+        Next notebook: **01 - Optimally sliced SDv1 (entity is the unit)**.

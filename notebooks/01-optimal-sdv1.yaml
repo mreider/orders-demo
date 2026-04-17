@@ -1,0 +1,141 @@
+name: "orders-demo / 01 - Optimally sliced SDv1 - entity is the unit"
+type: notebook
+content:
+  defaultTimeframe:
+    from: now()-30m
+    to: now()
+  sections:
+    - id: 00000000-0000-0000-0001-000000000001
+      type: markdown
+      markdown: |-
+        # Rung 1: Optimally sliced SDv1 - entity is the unit
+
+        The anchor showed SDv1 splits one JVM into multiple entities by
+        class (controller, listener) and by host group. That default
+        behavior is not the end of the story - it is the *splitting*
+        choice. The endpoint detail inside each split entity is a
+        separate axis.
+
+        **Enhanced endpoints** flips `NON_KEY_REQUESTS` into per-method
+        endpoints inside each WEB_SERVICE entity. It was turned on for
+        the `orders-sdv1` namespace via
+        `builtin:enhanced-endpoints-for-sdv1` (scope =
+        `CLOUD_APPLICATION_NAMESPACE` for `orders-sdv1`).
+
+        The splits themselves do not change. What changes is what lives
+        *inside* each split.
+    - id: 00000000-0000-0000-0001-000000000002
+      type: markdown
+      markdown: |-
+        ## 1. What endpoints live inside each SDv1 WEB_SERVICE?
+    - id: 00000000-0000-0000-0001-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries {
+              cnt    = sum(dt.service.request.count),
+              avg_rt = avg(dt.service.request.response_time),
+              failed = sum(dt.service.request.failure_count)
+            },
+            by: { dt.entity.service, endpoint.name },
+            from: now()-30m
+            | lookup [fetch dt.entity.service | fields id, entity.name, serviceType],
+                sourceField: dt.entity.service, lookupField: id, prefix: "svc."
+            | filter contains(svc.entity.name, "orders-demo - ")
+                AND svc.serviceType == "WEB_SERVICE"
+            | fields svc.entity.name, endpoint.name, cnt, avg_rt, failed
+            | sort svc.entity.name asc, cnt desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+    - id: 00000000-0000-0000-0001-000000000004
+      type: markdown
+      markdown: |-
+        **Result reading:** Each split WEB_SERVICE entity now exposes its
+        controller methods as endpoints:
+
+        - `orders-demo - OrderController`: `submit`, `search`
+        - `orders-demo - InventoryController`: `check`
+
+        Note the endpoint names are controller-method names (`submit`,
+        `search`, `check`) not `{HTTP-Method} {http.route}`. `http.route`
+        IS present on these spans (`/orders/submit`, `/orders/search`,
+        `/inventory/check`). OneAgent's Java sensor writes the
+        controller-method endpoint name at capture time, which takes
+        precedence over the OTel-style `http.route` detection rule. See
+        Rung 2 for the SDv2 side of the same behavior.
+
+        > **SDv1 split #1** - WEB_SERVICE per `@Controller`. Done at
+        > detection time.
+        >
+        > **SDv1 split #2** - endpoint per controller method. Done by
+        > enhanced endpoints, inside each WEB_SERVICE.
+
+        Health measurement follows the split: each endpoint has its own
+        response-time baseline, failure rate, and throughput - scoped to
+        its owning entity.
+
+        ## 2. How does the Kafka consumer look in SDv1?
+    - id: 00000000-0000-0000-0001-000000000005
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries {
+              cnt    = sum(dt.service.messaging.process.count),
+              failed = sum(dt.service.messaging.process.failure_count)
+            },
+            by: { dt.entity.service, messaging.destination.name, endpoint.name },
+            from: now()-30m
+            | lookup [fetch dt.entity.service | fields id, entity.name, serviceType],
+                sourceField: dt.entity.service, lookupField: id, prefix: "svc."
+            | filter svc.entity.name == "OrderEventsListener"
+                AND svc.serviceType == "MESSAGING_SERVICE"
+            | fields svc.entity.name, messaging.destination.name, endpoint.name, cnt, failed
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+    - id: 00000000-0000-0000-0001-000000000006
+      type: markdown
+      markdown: |-
+        **Result reading:** The Kafka consumer is its own entity
+        (`OrderEventsListener`, MESSAGING_SERVICE). Enhanced endpoints does
+        not apply to MESSAGING_SERVICE; endpoint shows as
+        `NON_KEY_REQUESTS`. The `messaging.destination.name` dimension
+        (`order-events`) is still available for grouping.
+
+        > **SDv1 split #3** - MESSAGING_SERVICE per `@KafkaListener`,
+        > separate from the WEB_SERVICE entities. Cross-transport health
+        > requires combining queries across these separate entities.
+
+        ## 3. The config surface that makes SDv1 optimal
+
+        Enhanced endpoints delivers per-method visibility for free. The
+        residual config surface teams still maintain:
+
+        | Config | Purpose |
+        |---|---|
+        | Service-naming rules | Rename `orders-demo - OrderController` to the team's nomenclature |
+        | Request naming rules | Bucket URL paths where `http.route` is not available |
+        | Tagging rules | Scope SLOs and alerts per team |
+        | Host-group splits | Separate prod from staging |
+
+        All of this load-bearing config *still* targets the entity surface
+        SDv1 produced by splitting. Each split needs its own naming,
+        tagging, and alert wiring.
+    - id: 00000000-0000-0000-0001-000000000007
+      type: markdown
+      markdown: |-
+        ## What you now know
+
+        > On SDv1, the unit of slicing is the entity. Splits happen at
+        > detection time (per controller, per listener, per host group).
+        > Enhanced endpoints adds a second axis of detail (per-method
+        > endpoints) inside each split entity. Health measurement and
+        > config are both entity-scoped.
+
+        Next notebook: **02 - Optimally sliced SDv2 (attribute is the
+        unit)**.
