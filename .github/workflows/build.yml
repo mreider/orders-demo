@@ -1,0 +1,57 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GKE_REGION: us-central1
+  AR_REPO: orders-demo
+  IMAGE_NAME: orders-demo
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.image.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GKE_REGION }}-docker.pkg.dev --quiet
+
+      - name: Compute image ref
+        id: image
+        run: |
+          REF="${GKE_REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${AR_REPO}/${IMAGE_NAME}:${GITHUB_SHA::7}"
+          LATEST="${GKE_REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${AR_REPO}/${IMAGE_NAME}:latest"
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+
+      - name: Build image
+        run: docker build -t "${{ steps.image.outputs.ref }}" -t "${{ steps.image.outputs.latest }}" ./app
+
+      - name: Push image
+        run: |
+          docker push "${{ steps.image.outputs.ref }}"
+          docker push "${{ steps.image.outputs.latest }}"
+
+      - name: Summary
+        run: echo "::notice::Pushed ${{ steps.image.outputs.ref }}"

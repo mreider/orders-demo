@@ -1,0 +1,185 @@
+# Second SDv2 namespace, applied during Rung 3 (docs/03-namespace-is-a-dimension.md).
+# Same image, same service.name. One replica, reduced load. The point is to
+# produce a second SERVICE_DEPLOYMENT under the same SERVICE identity.
+#
+# Apply with: kubectl apply -f k8s/50-sdv2-staging.yaml
+# After applying, also opt this namespace into SDv2 in the Dynatrace UI
+# (same steps as dynatrace/install.md Step 5).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: orders-sdv2-staging
+  labels:
+    dynatrace: "enabled"
+    orders-demo: "true"
+    detection: "sdv2"
+    environment: "staging"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: orders-sdv2-staging
+spec:
+  clusterIP: None
+  selector: { app: postgres }
+  ports: [{ port: 5432, targetPort: 5432 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: orders-sdv2-staging
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector: { matchLabels: { app: postgres } }
+  template:
+    metadata: { labels: { app: postgres } }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - { name: POSTGRES_DB,       value: orders }
+            - { name: POSTGRES_USER,     value: orders }
+            - { name: POSTGRES_PASSWORD, value: orders }
+            - { name: PGDATA,            value: /var/lib/postgresql/data/pgdata }
+          ports: [{ containerPort: 5432 }]
+          volumeMounts: [{ name: data, mountPath: /var/lib/postgresql/data }]
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "orders", "-d", "orders"] }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }
+      volumes: [{ name: data, emptyDir: {} }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redpanda
+  namespace: orders-sdv2-staging
+spec:
+  selector: { app: redpanda }
+  ports:
+    - { name: kafka, port: 9092, targetPort: 9092 }
+    - { name: admin, port: 9644, targetPort: 9644 }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redpanda
+  namespace: orders-sdv2-staging
+spec:
+  serviceName: redpanda
+  replicas: 1
+  selector: { matchLabels: { app: redpanda } }
+  template:
+    metadata: { labels: { app: redpanda } }
+    spec:
+      containers:
+        - name: redpanda
+          image: docker.redpanda.com/redpandadata/redpanda:v24.2.9
+          args:
+            - redpanda
+            - start
+            - --overprovisioned
+            - --smp=1
+            - --memory=512M
+            - --reserve-memory=0M
+            - --check=false
+            - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+            - --advertise-kafka-addr=PLAINTEXT://redpanda.orders-sdv2-staging.svc.cluster.local:9092
+          ports:
+            - { containerPort: 9092 }
+            - { containerPort: 9644 }
+          readinessProbe:
+            httpGet: { path: /v1/status/ready, port: 9644 }
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests: { cpu: "200m", memory: "512Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-demo
+  namespace: orders-sdv2-staging
+spec:
+  selector: { app: orders-demo }
+  ports: [{ port: 8080, targetPort: 8080 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-demo
+  namespace: orders-sdv2-staging
+spec:
+  replicas: 1   # staging runs smaller to look like staging
+  selector: { matchLabels: { app: orders-demo } }
+  template:
+    metadata: { labels: { app: orders-demo } }
+    spec:
+      containers:
+        - name: orders-demo
+          image: ${ORDERS_IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 8080 }]
+          env:
+            - { name: DB_URL,          value: "jdbc:postgresql://postgres:5432/orders" }
+            - { name: DB_USER,         value: "orders" }
+            - { name: DB_PASSWORD,     value: "orders" }
+            - { name: KAFKA_BOOTSTRAP, value: "redpanda:9092" }
+            - { name: JAVA_TOOL_OPTIONS, value: "-Xms256m -Xmx512m" }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "200m", memory: "512Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loadtest-script
+  namespace: orders-sdv2-staging
+data:
+  loadtest.js: |
+    # populated by scripts/up.sh (kubectl create configmap --from-file)
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: loadgen
+  namespace: orders-sdv2-staging
+spec:
+  backoffLimit: 1
+  template:
+    metadata: { labels: { app: loadgen } }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: grafana/k6:0.54.0
+          args: ["run", "/scripts/loadtest.js"]
+          env:
+            - { name: BASE_URL,      value: "http://orders-demo:8080" }
+            - { name: DURATION,      value: "30m" }
+            - { name: RATE_INVENTORY, value: "20" }  # lower rates = staging
+            - { name: RATE_SEARCH,    value: "8" }
+            - { name: RATE_SUBMIT,    value: "2" }
+          volumeMounts: [{ name: script, mountPath: /scripts }]
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "256Mi" }
+      volumes:
+        - name: script
+          configMap: { name: loadtest-script }

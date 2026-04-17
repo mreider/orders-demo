@@ -1,0 +1,85 @@
+# k6 load generator: identical Job in each namespace.
+# Script is mounted from a ConfigMap built from load/loadtest.js by scripts/up.sh.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loadtest-script
+  namespace: orders-sdv1
+data:
+  loadtest.js: |
+    # populated by scripts/up.sh (kubectl create configmap --from-file)
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: loadgen
+  namespace: orders-sdv1
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app: loadgen
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: grafana/k6:0.54.0
+          args: ["run", "/scripts/loadtest.js"]
+          env:
+            - name: BASE_URL
+              value: http://orders-demo:8080
+            - name: DURATION
+              value: "30m"
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "256Mi" }
+      volumes:
+        - name: script
+          configMap:
+            name: loadtest-script
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loadtest-script
+  namespace: orders-sdv2
+data:
+  loadtest.js: |
+    # populated by scripts/up.sh (kubectl create configmap --from-file)
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: loadgen
+  namespace: orders-sdv2
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app: loadgen
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: grafana/k6:0.54.0
+          args: ["run", "/scripts/loadtest.js"]
+          env:
+            - name: BASE_URL
+              value: http://orders-demo:8080
+            - name: DURATION
+              value: "30m"
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "256Mi" }
+      volumes:
+        - name: script
+          configMap:
+            name: loadtest-script

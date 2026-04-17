@@ -1,0 +1,59 @@
+name: cluster-down
+
+on:
+  workflow_dispatch:
+    inputs:
+      cluster_name:
+        description: "GKE cluster name"
+        default: "orders-demo"
+      zone:
+        description: "GKE zone"
+        default: "us-central1-c"
+      ar_repo:
+        description: "Artifact Registry repo name"
+        default: "orders-demo"
+      confirm:
+        description: "Type 'delete' to confirm"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  down:
+    if: ${{ inputs.confirm == 'delete' }}
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+      GKE_CLUSTER: ${{ inputs.cluster_name }}
+      GKE_ZONE: ${{ inputs.zone }}
+      GKE_REGION: us-central1
+      AR_REPO: ${{ inputs.ar_repo }}
+    steps:
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Delete GKE cluster
+        run: |
+          set -euo pipefail
+          if gcloud container clusters describe "$GKE_CLUSTER" --zone "$GKE_ZONE" >/dev/null 2>&1; then
+            gcloud container clusters delete "$GKE_CLUSTER" --zone "$GKE_ZONE" --quiet
+          else
+            echo "Cluster $GKE_CLUSTER not found"
+          fi
+
+      - name: Delete Artifact Registry repo
+        run: |
+          set -euo pipefail
+          if gcloud artifacts repositories describe "$AR_REPO" --location "$GKE_REGION" >/dev/null 2>&1; then
+            gcloud artifacts repositories delete "$AR_REPO" --location "$GKE_REGION" --quiet
+          else
+            echo "Artifact Registry $AR_REPO not found"
+          fi

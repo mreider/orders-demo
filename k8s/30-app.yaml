@@ -1,0 +1,116 @@
+# The Spring Boot app: identical Deployment in each namespace.
+# Same image, same config, same replicas - this is what makes the
+# side-by-side SDv1 vs SDv2 comparison honest.
+#
+# ${ORDERS_IMAGE} is substituted by scripts/up.sh via envsubst.
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-demo
+  namespace: orders-sdv1
+spec:
+  selector:
+    app: orders-demo
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-demo
+  namespace: orders-sdv1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: orders-demo
+  template:
+    metadata:
+      labels:
+        app: orders-demo
+    spec:
+      containers:
+        - name: orders-demo
+          image: ${ORDERS_IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_URL
+              value: jdbc:postgresql://postgres:5432/orders
+            - name: DB_USER
+              value: orders
+            - name: DB_PASSWORD
+              value: orders
+            - name: KAFKA_BOOTSTRAP
+              value: redpanda:9092
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms256m -Xmx512m"
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "200m", memory: "512Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-demo
+  namespace: orders-sdv2
+spec:
+  selector:
+    app: orders-demo
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-demo
+  namespace: orders-sdv2
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: orders-demo
+  template:
+    metadata:
+      labels:
+        app: orders-demo
+    spec:
+      containers:
+        - name: orders-demo
+          image: ${ORDERS_IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_URL
+              value: jdbc:postgresql://postgres:5432/orders
+            - name: DB_USER
+              value: orders
+            - name: DB_PASSWORD
+              value: orders
+            - name: KAFKA_BOOTSTRAP
+              value: redpanda:9092
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms256m -Xmx512m"
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "200m", memory: "512Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }

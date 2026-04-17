@@ -1,0 +1,99 @@
+name: cluster-up
+
+on:
+  workflow_dispatch:
+    inputs:
+      cluster_name:
+        description: "GKE cluster name"
+        default: "orders-demo"
+      zone:
+        description: "GKE zone"
+        default: "us-central1-c"
+      ar_repo:
+        description: "Artifact Registry repo name"
+        default: "orders-demo"
+
+permissions:
+  contents: read
+
+jobs:
+  up:
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+      GKE_CLUSTER: ${{ inputs.cluster_name }}
+      GKE_ZONE: ${{ inputs.zone }}
+      GKE_REGION: us-central1
+      AR_REPO: ${{ inputs.ar_repo }}
+      DT_TENANT_ID: ${{ secrets.DT_TENANT_ID }}
+      DT_API_TOKEN: ${{ secrets.DT_API_TOKEN }}
+      DT_DATA_INGEST_TOKEN: ${{ secrets.DT_DATA_INGEST_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Install gke-gcloud-auth-plugin
+        run: |
+          gcloud components install gke-gcloud-auth-plugin --quiet
+
+      - name: Create GKE cluster if missing
+        run: |
+          set -euo pipefail
+          if ! gcloud container clusters describe "$GKE_CLUSTER" --zone "$GKE_ZONE" >/dev/null 2>&1; then
+            gcloud container clusters create "$GKE_CLUSTER" \
+              --zone "$GKE_ZONE" \
+              --num-nodes 3 \
+              --machine-type e2-standard-4 \
+              --release-channel regular \
+              --enable-ip-alias \
+              --workload-pool "${GCP_PROJECT}.svc.id.goog"
+          else
+            echo "Cluster $GKE_CLUSTER already exists"
+          fi
+          gcloud container clusters get-credentials "$GKE_CLUSTER" --zone "$GKE_ZONE"
+
+      - name: Create Artifact Registry repo if missing
+        run: |
+          set -euo pipefail
+          if ! gcloud artifacts repositories describe "$AR_REPO" --location "$GKE_REGION" >/dev/null 2>&1; then
+            gcloud artifacts repositories create "$AR_REPO" \
+              --repository-format=docker \
+              --location="$GKE_REGION"
+          fi
+
+      - name: Install Dynatrace Operator
+        run: |
+          set -euo pipefail
+          OP_VER=$(curl -s https://api.github.com/repos/Dynatrace/dynatrace-operator/releases/latest | jq -r .tag_name)
+          echo "Installing operator $OP_VER"
+          kubectl create namespace dynatrace --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -f "https://github.com/Dynatrace/dynatrace-operator/releases/download/${OP_VER}/kubernetes.yaml"
+          kubectl -n dynatrace wait pod \
+            --for=condition=Ready \
+            --selector=app.kubernetes.io/name=dynatrace-operator \
+            --timeout=300s
+
+      - name: Create DynaKube secret
+        run: |
+          kubectl -n dynatrace create secret generic dynakube \
+            --from-literal=apiToken="$DT_API_TOKEN" \
+            --from-literal=dataIngestToken="$DT_DATA_INGEST_TOKEN" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply DynaKube
+        run: |
+          sed "s|<YOUR_TENANT_ID>|${DT_TENANT_ID}|g" dynatrace/dynakube.yaml | kubectl apply -f -
+
+      - name: Summary
+        run: |
+          echo "::notice::Cluster $GKE_CLUSTER ready in $GKE_ZONE. Run the 'build' and 'deploy' workflows next."
+          echo "::notice::After deploy, opt orders-sdv2 into SDv2 in the Dynatrace UI (see dynatrace/install.md step 5)."

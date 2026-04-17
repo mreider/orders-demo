@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: orders-sdv1
+  labels:
+    dynatrace: "enabled"
+    orders-demo: "true"
+    detection: "sdv1"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: orders-sdv2
+  labels:
+    dynatrace: "enabled"
+    orders-demo: "true"
+    detection: "sdv2"
