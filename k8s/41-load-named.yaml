@@ -1,22 +1,27 @@
 # Load generator for the orders-demo-named workload in orders-sdv1. Reuses the
 # same loadtest-script ConfigMap as 40-load.yaml - only the BASE_URL differs.
-apiVersion: batch/v1
-kind: Job
+# Runs k6 in a shell loop so traffic never stops.
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: loadgen-named
   namespace: orders-sdv1
 spec:
-  backoffLimit: 3
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loadgen-named
   template:
     metadata:
       labels:
         app: loadgen-named
     spec:
-      restartPolicy: Never
       containers:
         - name: k6
           image: grafana/k6:0.54.0
-          args: ["run", "/scripts/loadtest.js"]
+          command: ["/bin/sh", "-c"]
+          args:
+            - "while true; do k6 run /scripts/loadtest.js; sleep 1; done"
           env:
             - name: BASE_URL
               value: http://orders-demo-named:8080

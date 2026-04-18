@@ -1,0 +1,111 @@
+# postgres_exporter: exposes Postgres server-side metrics on :9187/metrics.
+# One Deployment per namespace (orders-sdv1 + orders-sdv2). The pod annotation
+# `extension.dynatrace.com/name: com.dynatrace.postgres` matches the default
+# relabel rule in the com.dynatrace.extension.otel-postgres Hub extension,
+# so the extension's Prometheus scrape picks these up.
+#
+# Metrics land in Grail under com.dynatrace.extension.otel-postgres keys such as
+# postgres.num_backends, postgres.xact_commit, postgres.blks_hit — i.e., they
+# reflect Postgres's own view of itself, not the caller's JDBC span.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-exporter
+  namespace: orders-sdv1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-exporter
+  template:
+    metadata:
+      labels:
+        app: postgres-exporter
+      annotations:
+        extension.dynatrace.com/name: com.dynatrace.postgres
+    spec:
+      containers:
+        - name: exporter
+          image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+          args:
+            - "--web.listen-address=:9187"
+            - "--extend.query-path=/etc/queries/queries.yaml"
+          env:
+            - name: DATA_SOURCE_NAME
+              value: "postgresql://orders:orders@postgres:5432/orders?sslmode=disable"
+          ports:
+            - name: metrics
+              containerPort: 9187
+          resources:
+            requests: { cpu: "50m",  memory: "64Mi" }
+            limits:   { cpu: "250m", memory: "256Mi" }
+          volumeMounts:
+            - name: queries
+              mountPath: /etc/queries
+      volumes:
+        - name: queries
+          configMap:
+            name: postgres-exporter-queries
+            optional: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-exporter
+  namespace: orders-sdv1
+  labels:
+    app: postgres-exporter
+spec:
+  selector:
+    app: postgres-exporter
+  ports:
+    - name: metrics
+      port: 9187
+      targetPort: 9187
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-exporter
+  namespace: orders-sdv2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-exporter
+  template:
+    metadata:
+      labels:
+        app: postgres-exporter
+      annotations:
+        extension.dynatrace.com/name: com.dynatrace.postgres
+    spec:
+      containers:
+        - name: exporter
+          image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+          args:
+            - "--web.listen-address=:9187"
+          env:
+            - name: DATA_SOURCE_NAME
+              value: "postgresql://orders:orders@postgres:5432/orders?sslmode=disable"
+          ports:
+            - name: metrics
+              containerPort: 9187
+          resources:
+            requests: { cpu: "50m",  memory: "64Mi" }
+            limits:   { cpu: "250m", memory: "256Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-exporter
+  namespace: orders-sdv2
+  labels:
+    app: postgres-exporter
+spec:
+  selector:
+    app: postgres-exporter
+  ports:
+    - name: metrics
+      port: 9187
+      targetPort: 9187

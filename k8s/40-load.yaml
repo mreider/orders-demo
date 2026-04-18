@@ -1,25 +1,31 @@
-# k6 load generator: identical Job in each namespace.
+# k6 load generator: one Deployment per namespace. The pod runs k6 in a
+# shell loop so traffic never stops - when a 30m run ends, the next one
+# starts immediately; if the pod dies the Deployment restarts it.
 #
 # The loadtest-script ConfigMap is NOT declared here on purpose - it is
 # created at apply-time from load/loadtest.js by scripts/up.sh and by the
 # deploy workflow (so the script lives in one place: load/loadtest.js).
-apiVersion: batch/v1
-kind: Job
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: loadgen
   namespace: orders-sdv1
 spec:
-  backoffLimit: 3
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loadgen
   template:
     metadata:
       labels:
         app: loadgen
     spec:
-      restartPolicy: Never
       containers:
         - name: k6
           image: grafana/k6:0.54.0
-          args: ["run", "/scripts/loadtest.js"]
+          command: ["/bin/sh", "-c"]
+          args:
+            - "while true; do k6 run /scripts/loadtest.js; sleep 1; done"
           env:
             - name: BASE_URL
               value: http://orders-demo:8080
@@ -36,23 +42,27 @@ spec:
           configMap:
             name: loadtest-script
 ---
-apiVersion: batch/v1
-kind: Job
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: loadgen
   namespace: orders-sdv2
 spec:
-  backoffLimit: 3
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loadgen
   template:
     metadata:
       labels:
         app: loadgen
     spec:
-      restartPolicy: Never
       containers:
         - name: k6
           image: grafana/k6:0.54.0
-          args: ["run", "/scripts/loadtest.js"]
+          command: ["/bin/sh", "-c"]
+          args:
+            - "while true; do k6 run /scripts/loadtest.js; sleep 1; done"
           env:
             - name: BASE_URL
               value: http://orders-demo:8080

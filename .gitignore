@@ -8,6 +8,11 @@ scripts/capture.js
 
 .DS_Store
 
+# Local tool config — may contain tenant URLs, tokens, or environment-specific
+# MCP wiring. Keep out of the public repo.
+.claude/
+.mcp.json
+
 # PowerPoint opens a ~$file.pptx lock file in the same dir; never commit it.
 ~$*.pptx
 
