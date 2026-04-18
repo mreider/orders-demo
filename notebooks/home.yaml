@@ -1,4 +1,4 @@
-name: "Services in Latest Dynatrace - Curriculum Home"
+name: "SDv2 demo / Home"
 type: notebook
 content:
   defaultTimeframe:
@@ -8,94 +8,78 @@ content:
     - id: 00000000-0000-0000-ffff-000000000001
       type: markdown
       markdown: |-
-        # Services in Latest Dynatrace - Curriculum Home
+        # SDv2 presentation: home
 
-        A hands-on course for existing Dynatrace customers on how the
-        Latest Services app models services, where its design differs
-        from Classic, and what to do today for features still in flight.
+        A migration presentation for Dynatrace customers moving from Service
+        Detection v1 to Service Detection v2 on OneAgent-monitored
+        workloads. Each section pairs a short narrative (on GitHub) with
+        an executable demo notebook (in this tenant). Open the notebooks
+        in order to follow the talk track, or pick one to answer a
+        specific question.
 
-        Every module pairs a short concept narrative (GitHub markdown)
-        with an executable lab notebook (in this tenant). The course
-        takes ~4 hours end-to-end; each module is a self-contained 15-20
-        minute unit. Run them in order.
-
-        > **The single idea the curriculum teaches:**
-        > Latest Dynatrace moved the unit of slicing from **entity** to
-        > **attribute**. One workload = one service entity, with
-        > dimensions that carry what used to require multiple entities
-        > to represent. Every module below is a worked consequence of
-        > that one shift.
+        > **The shift in one sentence:**
+        > SDv2 collapses the `dt.service.name` fragmentation that SDv1
+        > produces per controller class and listener. One workload now
+        > produces one `dt.service.name`, and per-endpoint granularity
+        > lives on first-class metric dimensions.
 
         ## Before you start
 
-        Read [Module 0 - Lab setup](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-1-what-is-a-service/module-0-lab-setup.md)
-        to ensure your tenant is loaded with the companion notebooks.
-        One-time `dtctl apply` loop covers it.
+        Skim [Follow along in your own tenant](https://github.com/mreider/orders-demo/blob/main/presentation/00-setup.md)
+        for the 3-minute setup. One `dtctl apply` loop and you're ready.
 
     - id: 00000000-0000-0000-ffff-000000000002
       type: markdown
       markdown: |-
-        ## Unit 1: What is a service, really?
+        ## Part 1: what is a service, really?
 
-        The foundational shift: from entity-first to attribute-first.
+        The foundational shift, from entity-first to attribute-first.
 
-        | # | Concept (narrative) | Lab (in this tenant) |
+        | # | Section (narrative) | Demo (this tenant) |
         |---|---|---|
-        | **1.1** | [One workload, one service](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-1-what-is-a-service/module-1-1-one-workload-one-service.md) | Notebooks app > "Curriculum / Module 1.1" |
-        | **1.2** | [The three transport families](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-1-what-is-a-service/module-1-2-three-transport-families.md) | Notebooks app > "Curriculum / Module 1.2" |
-        | **1.3** | [Dimensions, not entities, split the view](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-1-what-is-a-service/module-1-3-dimensions-not-entities.md) | Notebooks app > "Curriculum / Module 1.3" |
-        | **1.4** | [Classic vs Latest, side by side](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-1-what-is-a-service/module-1-4-classic-vs-latest.md) | Notebooks app > "Curriculum / Module 1.4" |
+        | **01** | [One workload, one service](https://github.com/mreider/orders-demo/blob/main/presentation/01-one-workload-one-service.md) | `SDv2 demo / 01 One workload, one service` |
+        | **02** | [Three transport families](https://github.com/mreider/orders-demo/blob/main/presentation/02-three-transport-families.md) | `SDv2 demo / 02 Three transport families` |
+        | **03** | [Dimensions, not entities](https://github.com/mreider/orders-demo/blob/main/presentation/03-dimensions-not-entities.md) | `SDv2 demo / 03 Dimensions, not entities` |
+        | **04** | [SDv1 vs SDv2, side by side](https://github.com/mreider/orders-demo/blob/main/presentation/04-sdv1-vs-sdv2.md) | `SDv2 demo / 04 SDv1 vs SDv2, side by side` |
 
     - id: 00000000-0000-0000-ffff-000000000003
       type: markdown
       markdown: |-
-        ## Unit 2: Naming and identity
+        ## Part 2: naming and identity
 
-        Where service names come from, why metric-first queries are
-        shorter, how to fix Classic services today, what's in flight.
+        Where service names come from, the metric-first query shift,
+        and the `service.name` fix for Classic services you own today.
 
-        | # | Concept (narrative) | Lab |
+        | # | Section (narrative) | Demo |
         |---|---|---|
-        | **2.1** | [Where names come from](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-2-naming-identity/module-2-1-where-names-come-from.md) | "Curriculum / Module 2.1" |
-        | **2.2** | [Metric-first queries](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-2-naming-identity/module-2-2-metric-first-queries.md) | "Curriculum / Module 2.2" |
-        | **2.3** | [The `service.name` workaround](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-2-naming-identity/module-2-3-service-name-workaround.md) | "Curriculum / Module 2.3" |
-        | **2.4** | [What's coming: pipeline-side naming](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-2-naming-identity/module-2-4-whats-coming-pipeline-naming.md) | *forward-looking, no lab* |
+        | **05** | [Where names come from](https://github.com/mreider/orders-demo/blob/main/presentation/05-where-names-come-from.md) | `SDv2 demo / 05 Where names come from` |
+        | **06** | [Metric-first queries](https://github.com/mreider/orders-demo/blob/main/presentation/06-metric-first-queries.md) | `SDv2 demo / 06 Metric-first queries` |
+        | **07** | [The `service.name` workaround](https://github.com/mreider/orders-demo/blob/main/presentation/07-service-name-workaround.md) | `SDv2 demo / 07 The service.name workaround` |
 
     - id: 00000000-0000-0000-ffff-000000000004
       type: markdown
       markdown: |-
-        ## Unit 3: Endpoints, dependencies, scale
+        ## Part 3: endpoints, dependencies, and what's next
 
-        Endpoints, downstream calls, and the additive entity that
-        replaces environment-based service splitting.
+        Endpoints, downstream calls, and the forward-looking direction
+        that replaces environment-based service splitting.
 
-        | # | Concept (narrative) | Lab |
+        | # | Section (narrative) | Demo |
         |---|---|---|
-        | **3.1** | [Every endpoint is baselined](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-3-endpoints-deps-scale/module-3-1-every-endpoint-baselined.md) | "Curriculum / Module 3.1" |
-        | **3.2** | [When `http.route` is missing](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-3-endpoints-deps-scale/module-3-2-when-http-route-missing.md) | "Curriculum / Module 3.2" |
-        | **3.3** | [Downstreams are tabs, not entities](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-3-endpoints-deps-scale/module-3-3-downstreams-are-tabs.md) | "Curriculum / Module 3.3" |
-        | **3.4** | [What's coming: SERVICE_DEPLOYMENT](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-3-endpoints-deps-scale/module-3-4-whats-coming-service-deployment.md) | *forward-looking, no lab* |
-
-    - id: 00000000-0000-0000-ffff-000000000005
-      type: markdown
-      markdown: |-
-        ## Capstone
-
-        [Capstone - one service, full walkthrough](https://github.com/mreider/orders-demo/blob/main/curriculum/capstone/capstone.md) | "Curriculum / Capstone"
-
-        A single notebook that runs the whole narrative end-to-end on
-        a workload you pick. No new concepts. Share the URL with a
-        colleague as a self-serve onboarding artifact.
+        | **08** | [Every endpoint is baselined](https://github.com/mreider/orders-demo/blob/main/presentation/08-every-endpoint-baselined.md) | `SDv2 demo / 08 Every endpoint is baselined` |
+        | **09** | [When `http.route` is missing](https://github.com/mreider/orders-demo/blob/main/presentation/09-when-http-route-missing.md) | `SDv2 demo / 09 When http.route is missing` |
+        | **10** | [Downstreams are tabs, not entities](https://github.com/mreider/orders-demo/blob/main/presentation/10-downstreams-are-tabs.md) | `SDv2 demo / 10 Downstreams are tabs` |
+        | | [What's coming](https://github.com/mreider/orders-demo/blob/main/presentation/11-whats-coming.md) | *forward-looking, no demo* |
 
     - id: 00000000-0000-0000-ffff-000000000006
       type: markdown
       markdown: |-
-        ## Tenant check: is the demo workload running?
+        ## Tenant check: is the companion demo workload running?
 
-        Several labs reference the companion `orders-demo` application
-        when a learner's tenant doesn't have the right shape. This
-        query confirms whether the demo is currently deployed in this
-        tenant and producing traffic.
+        Several sections optionally use the `orders-demo` Spring Boot
+        app when your tenant doesn't have a workload with the right
+        shape. This query confirms whether it's deployed here and
+        producing traffic.
 
     - id: 00000000-0000-0000-ffff-000000000007
       type: dql
@@ -116,22 +100,20 @@ content:
     - id: 00000000-0000-0000-ffff-000000000008
       type: markdown
       markdown: |-
-        **Result reading:**
+        **How to read this:**
 
-        - Expected when demo is live:
+        - Expected when the demo is live:
           - `orders-sdv1` + `orders-demo` (baseline Classic workload)
           - `orders-sdv1` + `orders-demo-named` (with `OTEL_SERVICE_NAME=orders-api`)
           - `orders-sdv2` + `orders-demo` (Latest detection)
-        - Zero rows -> demo loadgens have stopped. Re-apply the k6 Jobs:
-          `kubectl apply -f k8s/40-load.yaml k8s/41-load-named.yaml` in
-          the [orders-demo repo](https://github.com/mreider/orders-demo).
+        - Zero rows means the loadgens stopped. Re-apply them with
+          `kubectl apply -f k8s/40-load.yaml k8s/41-load-named.yaml` from the
+          [orders-demo repo](https://github.com/mreider/orders-demo).
 
     - id: 00000000-0000-0000-ffff-000000000009
       type: markdown
       markdown: |-
         ## Source
 
-        Full curriculum lives in the
-        [orders-demo](https://github.com/mreider/orders-demo)
-        repository under `curriculum/`. Feedback, PRs, and lab-query
-        bugfixes welcome there.
+        Everything lives in [mreider/orders-demo](https://github.com/mreider/orders-demo).
+        Feedback, PRs, and query fixes welcome.

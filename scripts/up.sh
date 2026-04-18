@@ -141,12 +141,12 @@ Next steps (manual):
 
 2. Wait ~5 minutes for the UNIFIED entity to appear.
 
-3. Load the curriculum notebooks into your tenant:
+3. Load the demo notebooks into your tenant:
    export DT_ENV=https://<your-tenant>.apps.dynatrace.com
    export DT_PLATFORM_TOKEN=dt0s16.XXXX...
-   ./scripts/load-curriculum.sh
+   ./scripts/load-demos.sh
 
-4. Walk the curriculum:
+4. Walk the presentation:
    Notebooks app > filter "Curriculum /" > Module 0 > run in order.
 
 Teardown: ./scripts/down.sh

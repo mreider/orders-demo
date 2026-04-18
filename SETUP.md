@@ -5,7 +5,7 @@ last_updated: 2026-04-18
 
 # Setup
 
-Start-to-finish guide: Dynatrace tokens, GKE cluster, Dynatrace Operator, deploy the app, load the curriculum notebooks into your tenant. Start-to-working state ≈ 20 minutes.
+Start-to-finish guide: Dynatrace tokens, GKE cluster, Dynatrace Operator, deploy the app, load the demo notebooks into your tenant. Start-to-working state ≈ 20 minutes.
 
 ## Prerequisites
 
@@ -14,8 +14,8 @@ Local tools:
 - [`gcloud`](https://cloud.google.com/sdk/docs/install) — authenticated to a GCP project you can create resources in.
 - [`kubectl`](https://kubernetes.io/docs/tasks/tools/) — for managing the cluster.
 - [`docker`](https://docs.docker.com/get-docker/) — for building the app image.
-- [`dtctl`](https://github.com/dynatrace-oss/dtctl) — for loading curriculum notebooks. `brew install dynatrace-oss/tap/dtctl`.
-- [`jq`](https://stedolan.github.io/jq/) — used by `scripts/load-curriculum.sh`.
+- [`dtctl`](https://github.com/dynatrace-oss/dtctl) - for loading demo notebooks. `brew install dynatrace-oss/tap/dtctl`.
+- [`jq`](https://stedolan.github.io/jq/) — used by `scripts/load-demos.sh`.
 - [`envsubst`](https://www.gnu.org/software/gettext/) — part of gettext, usually pre-installed on macOS (`brew install gettext`) or Linux.
 
 Access:
@@ -51,7 +51,7 @@ Generate a second token named `orders-demo-ingest`. Scopes:
 
 Save as `DT_DATA_INGEST_TOKEN`.
 
-### 1c. Platform token (for loading curriculum notebooks)
+### 1c. Platform token (for loading demo notebooks)
 
 Generate a third token named `orders-demo-notebooks` under **Settings → Personal access tokens → Generate new token**. Scopes:
 
@@ -113,11 +113,11 @@ dtctl auth login   # if not already
 dtctl query 'fetch dt.entity.service | filter contains(entity.name, "orders") | fields id, entity.name, serviceType'
 ```
 
-Expected: one row with `serviceType = UNIFIED` named `orders-sdv2 -- orders-demo`, alongside several Classic entities (`WEB_REQUEST_SERVICE`, `WEB_SERVICE`, `MESSAGING_SERVICE`, possibly `DATABASE_SERVICE`) for the `orders-sdv1` side.
+Expected: one row with `serviceType = UNIFIED` named `orders-sdv2 -- orders-demo`, plus a `WEB_REQUEST_SERVICE` entity for the `orders-sdv1` side (modern K8s-aware SDv1 produces one entity per workload; the per-class fragmentation sits on the `dt.service.name` dimension, not on separate entities).
 
-## 4. Load the curriculum notebooks
+## 4. Load the demo notebooks
 
-The 11 lab notebooks and the home notebook live in `curriculum/` and `notebooks/`. To load them into your tenant as environment-shared (`isPrivate: false`) notebooks, use the wrapper script:
+The 10 demo notebooks and the home notebook live in `presentation/` and `notebooks/`. To load them into your tenant as environment-shared (`isPrivate: false`) notebooks, use the wrapper script:
 
 ```bash
 export DT_ENV="https://abc12345.apps.dynatrace.com"
@@ -125,7 +125,7 @@ export DT_PLATFORM_TOKEN="dt0s16.XXXX…"
 
 dtctl auth login    # one-time; the wrapper uses dtctl for the apply step
 
-./scripts/load-curriculum.sh
+./scripts/load-demos.sh
 ```
 
 What it does, per notebook:
@@ -134,14 +134,14 @@ What it does, per notebook:
 2. `curl POST /environment-shares` — creates a read-access environment share so colleagues can discover the notebook.
 3. `curl PATCH /documents/{id}` with `isPrivate=false` — flips the notebook's visibility flag so it appears in the Notebooks app listing.
 
-Steps 2 and 3 exist because upstream `dtctl` currently lacks a `--share-environment` flag that does them automatically. PR [#165](https://github.com/dynatrace-oss/dtctl/pull/165) against `dynatrace-oss/dtctl` adds the flag; once merged and released, you can drop the wrapper and just use `dtctl apply -f <file> --share-environment --write-id`. See [scripts/load-curriculum.sh](scripts/load-curriculum.sh) for the wrapper source.
+Steps 2 and 3 exist because upstream `dtctl` currently lacks a `--share-environment` flag that does them automatically. PR [#165](https://github.com/dynatrace-oss/dtctl/pull/165) against `dynatrace-oss/dtctl` adds the flag; once merged and released, you can drop the wrapper and just use `dtctl apply -f <file> --share-environment --write-id`. See [scripts/load-demos.sh](scripts/load-demos.sh) for the wrapper source.
 
 ### If you already have the patched dtctl
 
 If you've built dtctl from [PR #165](https://github.com/dynatrace-oss/dtctl/pull/165), skip the wrapper:
 
 ```bash
-for f in curriculum/**/*.yaml notebooks/home.yaml; do
+for f in presentation/*.yaml notebooks/home.yaml; do
   dtctl apply -f "$f" --write-id --share-environment
 done
 ```
@@ -150,15 +150,15 @@ That's equivalent. The wrapper just backfills the two extra API calls `--share-e
 
 ## 5. Verify
 
-Open the Dynatrace **Notebooks** app. Filter by `Curriculum /`. You should see:
+Open the Dynatrace **Notebooks** app. Filter by `SDv2 demo`. You should see:
 
-- `Curriculum / Module 1.1 - One workload, one service`
-- … through `Curriculum / Module 3.4 - What's coming: SERVICE_DEPLOYMENT`
-- `Services in Latest Dynatrace - Curriculum Home`
+- `SDv2 demo / 01 One workload, one service`
+- ... through `SDv2 demo / 10 Downstreams are tabs, not entities`
+- `SDv2 demo / Home`
 
 Each is marked as shared with the environment (icon indicator in the notebooks list).
 
-Open Module 0 (lab setup) and run its sanity query. If it returns data, you're ready. Walk the curriculum in order.
+Open any demo and run its first query. If data comes back, you're ready. Walk them in order to follow the presentation, or pick one to answer a specific question.
 
 ## Teardown
 

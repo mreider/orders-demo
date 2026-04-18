@@ -1,0 +1,103 @@
+name: "SDv2 demo / 01 One workload, one service"
+type: notebook
+content:
+  defaultTimeframe:
+    from: now()-30m
+    to: now()
+  sections:
+    - id: 00000000-0000-0000-1101-000000000001
+      type: markdown
+      markdown: |-
+        # One workload, one service
+
+        Pick a K8s workload. Replace `<YOUR_NAMESPACE>` and `<YOUR_WORKLOAD>` in each query (or use `orders-sdv1` / `orders-sdv2` + `orders-demo`).
+
+    - id: 00000000-0000-0000-1101-000000000002
+      type: markdown
+      markdown: |-
+        ## Question 1: How many distinct `dt.service.name` values does this workload produce?
+
+    - id: 00000000-0000-0000-1101-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch spans, from: now()-30m
+            | filter matchesValue(k8s.namespace.name, "<YOUR_NAMESPACE>")
+                AND matchesValue(k8s.workload.name, "<YOUR_WORKLOAD>")
+            | summarize span_count = count(), by: {dt.service.name}
+            | sort span_count desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1101-000000000004
+      type: markdown
+      markdown: |-
+        Read:
+        - 1 row → SDv2. `dt.service.name` is typically `<namespace> -- <workload>`.
+        - 4-7+ rows → SDv1. You'll see per-controller (`<workload> - OrderController`), per-listener (`OrderEventsListener`), and an aggregate row.
+        - 0 rows → widen timeframe or check filter values.
+
+    - id: 00000000-0000-0000-1101-000000000005
+      type: markdown
+      markdown: |-
+        ## Question 2: Which detection model is this namespace on?
+
+        Check the underlying `dt.entity.service` — its `serviceType` field reveals whether the namespace is on SDv1 or SDv2.
+
+    - id: 00000000-0000-0000-1101-000000000006
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch spans, from: now()-30m
+            | filter matchesValue(k8s.namespace.name, "<YOUR_NAMESPACE>")
+                AND matchesValue(k8s.workload.name, "<YOUR_WORKLOAD>")
+            | summarize span_count = count(), by: {dt.entity.service}
+            | lookup [fetch dt.entity.service | fields id, entity.name, serviceType],
+                sourceField: dt.entity.service, lookupField: id, prefix: "svc."
+            | fields svc.entity.name, svc.serviceType, span_count
+            | sort svc.serviceType asc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1101-000000000007
+      type: markdown
+      markdown: |-
+        Read:
+        - `serviceType = UNIFIED` → SDv2 is active for this namespace.
+        - `serviceType = WEB_REQUEST_SERVICE` → SDv1 (modern K8s-aware — one entity per workload, fragmentation lives on `dt.service.name`).
+        - Mixed → namespace is in transition; both detection paths are active for a window.
+
+    - id: 00000000-0000-0000-1101-000000000008
+      type: markdown
+      markdown: |-
+        ## Question 3: Enumerate the fragmented names — what does each represent?
+
+    - id: 00000000-0000-0000-1101-000000000009
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries request_rate = sum(dt.service.request.count),
+            by: {dt.service.name},
+            filter: matchesValue(k8s.namespace.name, "<YOUR_NAMESPACE>")
+                AND matchesValue(k8s.workload.name, "<YOUR_WORKLOAD>"),
+            from: now()-30m
+            | sort arraySum(request_rate) desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1101-00000000000a
+      type: markdown
+      markdown: |-
+        Read:
+        - SDv2: one series. One identity, all the traffic.
+        - SDv1: four-plus series, each a named fragment (per controller class, per Kafka listener, plus an aggregate).
+        - Under SDv2 you'd split this view by `endpoint.name` instead. The per-endpoint granularity moves from service identity to a first-class metric dimension (covered later in the deck).

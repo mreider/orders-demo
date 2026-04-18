@@ -1,0 +1,102 @@
+name: "SDv2 demo / 05 Where names come from"
+type: notebook
+content:
+  defaultTimeframe:
+    from: now()-30m
+    to: now()
+  sections:
+    - id: 00000000-0000-0000-2101-000000000001
+      type: markdown
+      markdown: |-
+        # Where names come from
+
+        Three queries trace the naming chain from raw span attributes to the entity display name. Replace placeholders or use the demo workloads.
+
+    - id: 00000000-0000-0000-2101-000000000002
+      type: markdown
+      markdown: |-
+        ## Question 1: What resource attributes actually arrive on spans?
+
+    - id: 00000000-0000-0000-2101-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch spans, from: now()-30m
+            | filter matchesValue(k8s.namespace.name, "<YOUR_NAMESPACE>")
+                AND matchesValue(k8s.workload.name, "<YOUR_WORKLOAD>")
+            | summarize span_count = count(),
+                by: {service.name, k8s.workload.name, k8s.namespace.name,
+                     k8s.cluster.name, host.name}
+            | sort span_count desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-2101-000000000004
+      type: markdown
+      markdown: |-
+        Read:
+        - `service.name` populated → OTel resource attribute set; wins naming.
+        - Empty → falls back to K8s workload.
+
+    - id: 00000000-0000-0000-2101-000000000005
+      type: markdown
+      markdown: |-
+        ## Question 2: Which attribute produced the entity name?
+
+    - id: 00000000-0000-0000-2101-000000000006
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries cnt = sum(dt.service.request.count),
+            by: {dt.service.name, service.name, k8s.workload.name},
+            filter: matchesValue(k8s.namespace.name, "<YOUR_NAMESPACE>"),
+            from: now()-30m
+            | fields dt.service.name, service.name, k8s.workload.name
+            | sort dt.service.name asc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-2101-000000000007
+      type: markdown
+      markdown: |-
+        Read:
+        - `dt.service.name` == `service.name` → OTel won (step 1).
+        - `dt.service.name` == `k8s.workload.name` or `<ns> -- <workload>` → K8s fallback (step 2).
+        - Prefixed composite `orders-api (orders-demo - OrderController)` → Classic residue with prefix fix applied.
+
+    - id: 00000000-0000-0000-2101-000000000008
+      type: markdown
+      markdown: |-
+        ## Question 3: Same app, different naming
+
+        Demo setup: `orders-sdv1` has `orders-demo` (no service.name) and `orders-demo-named` (OTEL_SERVICE_NAME=orders-api).
+
+    - id: 00000000-0000-0000-2101-000000000009
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries cnt = sum(dt.service.request.count),
+            by: {dt.service.name, service.name, k8s.workload.name},
+            filter: matchesValue(k8s.namespace.name, "orders-sdv1"),
+            from: now()-30m
+            | fields k8s.workload.name, service.name, dt.service.name
+            | sort k8s.workload.name asc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-2101-00000000000a
+      type: markdown
+      markdown: |-
+        Read:
+        - Identical pods, identical image. One env var separates them.
+        - `orders-demo`: raw detected name.
+        - `orders-demo-named`: prefixed with `orders-api (...)` and `service.name` queryable directly.

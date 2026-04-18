@@ -1,8 +1,15 @@
 node_modules/
-package.json
 package-lock.json
-scripts/capture.js
-bin/
+package.json
 exports/
+bin/
+
+scripts/capture.js
+
+.DS_Store
+
+# PowerPoint opens a ~$file.pptx lock file in the same dir; never commit it.
+~$*.pptx
+
 # PPTX files under curriculum/ are checked in (see scripts/build-slides.sh).
 !curriculum/**/*.pptx

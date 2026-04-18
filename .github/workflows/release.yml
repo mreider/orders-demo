@@ -1,16 +1,14 @@
 name: release
 
 # Cuts a GitHub Release on every tag push. Packages the committed slides
-# and curriculum artifacts — the .pptx files under curriculum/ are the
-# release source of truth. If you've edited slides, run
-# `scripts/build-slides.sh` locally and commit before tagging.
+# and presentation artifacts. presentation/sdv2-presentation.pptx is the
+# release source of truth for slides; if you've edited any .slides.md,
+# run scripts/build-slides.sh locally and commit before tagging.
 #
 # Artifacts:
-#   curriculum-slides-<tag>.zip      — all 13 PPTX decks + their Marp source (bundle)
-#   curriculum-notebooks-<tag>.zip   — lab notebook YAMLs + home notebook
-#   curriculum-full-<tag>.tar.gz     — markdown + YAML + slides + PPTX + SETUP.md
-#   module-*.pptx                    — each deck attached individually for one-click
-#                                      download on the release page
+#   sdv2-presentation-<tag>.pptx       single consolidated deck, every section
+#   sdv2-demos-<tag>.zip   demo notebook YAMLs + home notebook
+#   sdv2-presentation-full-<tag>.tar.gz     markdown + YAML + slides source + pptx + SETUP.md
 #
 # The app image is not a release artifact. build.yml pushes it to
 # ghcr.io on every main-branch push, tagged by short SHA and :latest.
@@ -35,19 +33,17 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           mkdir -p dist
 
-          # Three bundles (aggregate downloads)
-          find curriculum -type f \( -name '*.pptx' -o -name '*.slides.md' \) \
-            | zip -@ "dist/curriculum-slides-${TAG}.zip"
+          # Single consolidated deck (all sections in one file)
+          cp presentation/sdv2-presentation.pptx "dist/sdv2-presentation-${TAG}.pptx"
 
-          find curriculum -name '*.yaml' ! -name '*.slides.md' -type f \
-            | zip -@ "dist/curriculum-notebooks-${TAG}.zip"
-          (cd notebooks && zip -g "../dist/curriculum-notebooks-${TAG}.zip" home.yaml)
+          # Lab notebooks bundle
+          find presentation -name '*.yaml' ! -name '*.slides.md' -type f \
+            | zip -@ "dist/sdv2-demos-${TAG}.zip"
+          (cd notebooks && zip -g "../dist/sdv2-demos-${TAG}.zip" home.yaml)
 
-          tar --exclude='*.DS_Store' -czf "dist/curriculum-full-${TAG}.tar.gz" \
-            curriculum notebooks/home.yaml SETUP.md curriculum/README.md
-
-          # Individual PPTX per module (one-click download)
-          find curriculum -name '*.pptx' -exec cp {} dist/ \;
+          # Full teaching tree (markdown + YAML + slides source + pptx + setup)
+          tar --exclude='*.DS_Store' -czf "dist/sdv2-presentation-full-${TAG}.tar.gz" \
+            presentation notebooks/home.yaml SETUP.md
 
           ls -la dist/
 
@@ -58,18 +54,15 @@ jobs:
           body: |
             ## orders-demo ${{ github.ref_name }}
 
-            **Bundles**
+            **Artifacts**
 
-            - `curriculum-slides-${{ github.ref_name }}.zip` — all 13 editable PPTX decks + Marp source.
-            - `curriculum-notebooks-${{ github.ref_name }}.zip` — 11 lab YAMLs + home notebook.
-            - `curriculum-full-${{ github.ref_name }}.tar.gz` — the whole teaching tree (narrative markdown + labs + slides + home notebook + setup guide).
-
-            **Per-module slides** (below) are each also attached individually for one-click download.
+            - `sdv2-presentation-${{ github.ref_name }}.pptx`: single editable deck covering every section of the SDv1 to SDv2 presentation.
+            - `sdv2-demos-${{ github.ref_name }}.zip`: the demo notebooks + home notebook.
+            - `sdv2-presentation-full-${{ github.ref_name }}.tar.gz`: the whole presentation tree (narrative markdown + demo YAMLs + Marp source + pptx + setup guide).
 
             See [SETUP.md](SETUP.md) for how to load into your tenant.
           files: |
-            dist/curriculum-slides-*.zip
-            dist/curriculum-notebooks-*.zip
-            dist/curriculum-full-*.tar.gz
-            dist/module-*.pptx
+            dist/sdv2-presentation-*.pptx
+            dist/sdv2-demos-*.zip
+            dist/sdv2-presentation-full-*.tar.gz
           generate_release_notes: true
