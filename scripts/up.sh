@@ -94,15 +94,17 @@ log "Applying DynaKube"
 sed "s|<DT_API_URL>|${DT_API_URL}|g" "${ROOT}/dynatrace/dynakube.yaml" | kubectl apply -f -
 
 # ---- 6. namespaces + infra + apps ----
-log "Applying namespaces and infra (Postgres + Redpanda in each namespace)"
+log "Applying namespaces and infra (Postgres + postgres-exporter + Kafka in each namespace)"
 kubectl apply -f "${ROOT}/k8s/00-namespaces.yaml"
 kubectl apply -f "${ROOT}/k8s/10-postgres.yaml"
-kubectl apply -f "${ROOT}/k8s/20-redpanda.yaml"
+kubectl apply -f "${ROOT}/k8s/11-postgres-exporter.yaml"
+kubectl apply -f "${ROOT}/k8s/20-kafka.yaml"
 
-log "Waiting for Postgres and Redpanda to be ready"
+log "Waiting for Postgres, postgres-exporter, and Kafka to be ready"
 for ns in orders-sdv1 orders-sdv2; do
-  kubectl -n "${ns}" rollout status statefulset/postgres --timeout=180s
-  kubectl -n "${ns}" rollout status statefulset/redpanda --timeout=180s
+  kubectl -n "${ns}" rollout status statefulset/postgres          --timeout=180s
+  kubectl -n "${ns}" rollout status statefulset/kafka             --timeout=240s
+  kubectl -n "${ns}" rollout status deployment/postgres-exporter  --timeout=120s
 done
 
 log "Applying app Deployments (image: ${ORDERS_IMAGE})"
@@ -122,7 +124,7 @@ for ns in orders-sdv1 orders-sdv2; do
     --dry-run=client -o yaml | kubectl apply -f -
 done
 
-log "Applying load Jobs"
+log "Applying loadgen Deployments (always-on k6 via while-true wrapper)"
 kubectl apply -f "${ROOT}/k8s/40-load.yaml"
 kubectl apply -f "${ROOT}/k8s/41-load-named.yaml"
 

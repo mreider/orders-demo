@@ -9,6 +9,17 @@ on:
   workflow_run:
     workflows: [build]
     types: [completed]
+  # Keep the cluster in sync with the repo. Any manifest / deploy-script
+  # change on main triggers a re-apply. kubectl apply is idempotent for
+  # creates and updates, but it does NOT delete resources whose manifest
+  # was removed — if you delete a file under k8s/, also `kubectl delete`
+  # the resource it created, or add --prune with a managed-by label.
+  push:
+    branches: [main]
+    paths:
+      - "k8s/**"
+      - "load/**"
+      - ".github/workflows/deploy.yml"
 
 permissions:
   contents: read
@@ -22,8 +33,9 @@ env:
 
 jobs:
   deploy:
-    # Only run on manual trigger, or when the 'build' workflow succeeds.
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # Run on manual trigger, on a successful 'build' workflow run, or on
+    # any push that touches manifests / load scripts.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,6 +63,14 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             TAG="${GITHUB_SHA::7}"
           fi
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # Manifest-only sync — preserve whatever image tag is already running.
+            # This keeps app pod images stable when only k8s manifests change.
+            # Falls back to 'latest' if the Deployment doesn't exist yet (bootstrap).
+            RUNNING=$(kubectl -n orders-sdv1 get deploy orders-demo \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | awk -F: '{print $NF}' || true)
+            TAG="${RUNNING:-latest}"
+          fi
           REF="${REGISTRY}/${IMAGE_NAME}:${TAG}"
           echo "ORDERS_IMAGE=$REF" >> "$GITHUB_ENV"
           echo "::notice::Deploying $REF"
@@ -59,10 +79,12 @@ jobs:
         run: |
           kubectl apply -f k8s/00-namespaces.yaml
           kubectl apply -f k8s/10-postgres.yaml
-          kubectl apply -f k8s/20-redpanda.yaml
+          kubectl apply -f k8s/11-postgres-exporter.yaml
+          kubectl apply -f k8s/20-kafka.yaml
           for ns in orders-sdv1 orders-sdv2; do
             kubectl -n "$ns" rollout status statefulset/postgres --timeout=180s
-            kubectl -n "$ns" rollout status statefulset/redpanda --timeout=180s
+            kubectl -n "$ns" rollout status statefulset/kafka    --timeout=240s
+            kubectl -n "$ns" rollout status deployment/postgres-exporter --timeout=120s
           done
 
       - name: Apply app Deployments (with image substitution)
