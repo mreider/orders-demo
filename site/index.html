@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>orders-demo — Classic to Latest Services app in Dynatrace</title>
+<meta name="description" content="Spring Boot app + 90-minute curriculum teaching the Classic-to-Latest Services app transition in Dynatrace. Hands-on labs run against your own tenant.">
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #0a0a14;
+    --bg-2: #0f0f1c;
+    --fg: #e8e8f0;
+    --muted: #8a8aa0;
+    --cyan: #00a1e0;
+    --purple: #b455b6;
+    --line: #20202e;
+    --code-bg: #16161f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+  body {
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+  h1 { font-size: 1.9em; margin: 0 0 6px; }
+  h1 .tag { font-weight: 400; color: var(--cyan); }
+  h2 {
+    font-size: 1.15em; margin-top: 40px; margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  p { margin: 10px 0; }
+  a { color: var(--cyan); text-decoration: none; border-bottom: 1px solid transparent; }
+  a:hover { border-bottom-color: var(--cyan); }
+  .sub { color: var(--muted); margin: 0 0 32px; max-width: 60ch; }
+  .grad {
+    height: 3px;
+    background: linear-gradient(90deg, var(--cyan), var(--purple));
+    margin: 32px 0 12px;
+    border: 0;
+  }
+  .cta {
+    display: inline-block;
+    padding: 10px 18px;
+    margin-right: 8px;
+    background: var(--cyan);
+    color: #0a0a14;
+    border-radius: 6px;
+    font-weight: 600;
+    border-bottom: 0;
+  }
+  .cta.alt {
+    background: transparent;
+    color: var(--fg);
+    border: 1px solid var(--line);
+  }
+  .cta:hover { filter: brightness(1.15); border-bottom: 0; }
+  code, pre { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.9em; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 3px; }
+  pre {
+    background: var(--code-bg);
+    padding: 14px 16px;
+    border-radius: 6px;
+    border-left: 2px solid var(--cyan);
+    overflow-x: auto;
+  }
+  pre code { background: transparent; padding: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.03em; }
+  td.m { color: var(--muted); }
+  .units {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+  @media (max-width: 620px) { .units { grid-template-columns: 1fr; } }
+  .unit {
+    background: var(--bg-2);
+    padding: 16px;
+    border-radius: 6px;
+    border-top: 2px solid var(--cyan);
+  }
+  .unit:nth-child(2) { border-top-color: #6cc0d3; }
+  .unit:nth-child(3) { border-top-color: var(--purple); }
+  .unit h3 { margin: 0 0 6px; font-size: 1em; }
+  .unit p { font-size: 0.9em; color: var(--muted); margin: 6px 0 0; }
+  footer {
+    margin-top: 56px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.85em;
+  }
+  footer a { color: var(--muted); }
+  footer a:hover { color: var(--cyan); }
+</style>
+</head>
+<body>
+
+<h1>orders-demo <span class="tag">/ Classic → Latest Services app</span></h1>
+<p class="sub">
+  A Spring Boot app plus a 90-minute curriculum that teaches the shift from Classic
+  (SDv1) to the Latest (SDv2) Services app in Dynatrace. Labs run against your own tenant.
+</p>
+
+<p>
+  <a class="cta" href="https://github.com/mreider/orders-demo">View on GitHub</a>
+  <a class="cta alt" href="https://github.com/mreider/orders-demo/blob/main/SETUP.md">Setup guide</a>
+  <a class="cta alt" href="https://github.com/mreider/orders-demo/blob/main/curriculum/README.md">Curriculum</a>
+</p>
+
+<h2>What it teaches</h2>
+<div class="units">
+  <div class="unit">
+    <h3>Unit 1 — What is a service?</h3>
+    <p>Entity-first → attribute-first. Workload as the unit. Three transport families. Classic fragmentation vs. the UNIFIED entity.</p>
+  </div>
+  <div class="unit">
+    <h3>Unit 2 — Naming &amp; identity</h3>
+    <p>Where service names come from, metric-first queries, the <code>service.name</code> workaround for Classic services today, pipeline-side naming that's coming.</p>
+  </div>
+  <div class="unit">
+    <h3>Unit 3 — Endpoints, deps, scale</h3>
+    <p>Every endpoint baselined, the <code>http.route</code> gap, downstreams as tabs not entities, SERVICE_DEPLOYMENT for per-environment views.</p>
+  </div>
+</div>
+
+<h2>How it works</h2>
+<p>
+  Twelve labs and two forward-looking readings. Each lab is a Dynatrace notebook
+  that queries against your own tenant. A companion Spring Boot app fills in when
+  the tenant doesn't already have a workload with the right shape.
+</p>
+
+<table>
+  <tr><th>Component</th><th>What it is</th></tr>
+  <tr><td><code>app/</code></td><td class="m">Spring Boot monolith — two controllers, a Kafka consumer, a JDBC client</td></tr>
+  <tr><td><code>k8s/</code></td><td class="m">Manifests: two namespaces, Postgres + Redpanda per side, two app deployments in Classic + one in Latest, two loadgens</td></tr>
+  <tr><td><code>curriculum/</code></td><td class="m">Thirteen module directories, each with a markdown narrative, lab notebook YAML, Marp slides, and editable PPTX</td></tr>
+  <tr><td><code>scripts/up.sh</code></td><td class="m">Brings up the whole stack on GKE in one command</td></tr>
+  <tr><td><code>scripts/load-curriculum.sh</code></td><td class="m">Loads every lab into your tenant with an environment share</td></tr>
+</table>
+
+<h2>Quick start</h2>
+<pre><code># After you've set the required env vars (see SETUP.md):
+./scripts/up.sh
+./scripts/load-curriculum.sh</code></pre>
+<p>
+  Full prerequisites — GKE, Dynatrace tokens, dtctl — in the
+  <a href="https://github.com/mreider/orders-demo/blob/main/SETUP.md">setup guide</a>.
+</p>
+
+<h2>Releases</h2>
+<p>
+  Each tagged release bundles the curriculum as three downloadable artifacts on the
+  <a href="https://github.com/mreider/orders-demo/releases">releases page</a>:
+  slides (PPTX), notebooks (YAML), and the full teaching tree (tarball).
+</p>
+
+<hr class="grad">
+
+<footer>
+  <a href="https://github.com/mreider/orders-demo">Source</a> ·
+  <a href="https://github.com/mreider/orders-demo/blob/main/LICENSE">MIT</a> ·
+  Built for teaching the Services app transition. Not an official Dynatrace project.
+</footer>
+
+</body>
+</html>
