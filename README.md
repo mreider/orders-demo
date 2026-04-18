@@ -45,5 +45,26 @@ scripts/      up.sh / down.sh (local) + load-curriculum.sh (notebook loader)
 load/         k6 loadgen script
 curriculum/   13-module course (markdown + notebook YAML + Marp slides + pptx)
 notebooks/    home.yaml — the curriculum's landing notebook
-.github/workflows/   cluster-up, cluster-down, build, deploy
+.github/workflows/   cluster-up, cluster-down, build, deploy, release
 ```
+
+## Slides
+
+Each module ships with an editable `.pptx` alongside its `.slides.md` Marp
+source. To rebuild after editing a deck:
+
+```bash
+./scripts/build-slides.sh
+```
+
+Requires [md-to-pptx](https://bitbucket.lab.dynatrace.org/scm/~matthew.reider/md-to-dt-pptx.git) cloned at `../md-to-pptx` (or set `MDTPPX_DIR`).
+
+## Releases
+
+Tag and push to cut a GitHub Release that bundles:
+
+- `curriculum-slides-<tag>.zip` — all 13 PPTX + Marp source.
+- `curriculum-notebooks-<tag>.zip` — 11 lab YAMLs + home notebook.
+- `curriculum-full-<tag>.tar.gz` — the whole teaching tree (markdown + YAML + slides + PPTX + SETUP.md).
+
+The app image itself is built by `.github/workflows/build.yml` into Artifact Registry on every push to `main`; it's not a release artifact.

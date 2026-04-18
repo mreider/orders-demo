@@ -4,4 +4,5 @@ package-lock.json
 scripts/capture.js
 bin/
 exports/
-*.pptx
+# PPTX files under curriculum/ are checked in (see scripts/build-slides.sh).
+!curriculum/**/*.pptx

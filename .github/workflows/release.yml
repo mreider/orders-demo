@@ -1,0 +1,90 @@
+name: release
+
+# Cuts a GitHub Release on every tag push. The release bundles slides and
+# curriculum artifacts so customers can grab what they need without cloning.
+#
+#   curriculum-slides-<tag>.zip      — all 13 PPTX decks, Marp source, no app/infra
+#   curriculum-notebooks-<tag>.zip   — lab notebook YAMLs only (for tenants using
+#                                      upstream dtctl without the --share-environment
+#                                      flag — they can still load manually)
+#   curriculum-full-<tag>.tar.gz     — curriculum/ + notebooks/home.yaml
+#                                      (markdown + YAML + slides + PPTX, the teaching
+#                                      content decoupled from the app + k8s + scripts)
+#
+# The app image itself is built/pushed by build.yml into Artifact Registry on every
+# push to main. It is not a release artifact — customers build from source via the
+# documented setup flow.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write  # required for softprops/action-gh-release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Clone md-to-pptx
+        run: |
+          git clone --depth=1 https://bitbucket.lab.dynatrace.org/scm/~matthew.reider/md-to-dt-pptx.git \
+            "${{ github.workspace }}/../md-to-pptx"
+          cd "${{ github.workspace }}/../md-to-pptx"
+          npm install --no-audit --no-fund
+
+      - name: Rebuild slides
+        run: MDTPPX_DIR="${{ github.workspace }}/../md-to-pptx" ./scripts/build-slides.sh
+
+      - name: Package artifacts
+        id: pkg
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+
+          mkdir -p dist
+
+          # Slides (PPTX + Marp source, no narratives/labs)
+          find curriculum -type f \( -name '*.pptx' -o -name '*.slides.md' \) \
+            | zip -@ "dist/curriculum-slides-${TAG}.zip"
+
+          # Notebook YAMLs only (for direct dtctl apply)
+          find curriculum -name '*.yaml' ! -name '*.slides.md' -type f \
+            | zip -@ "dist/curriculum-notebooks-${TAG}.zip"
+          (cd notebooks && zip -g "../dist/curriculum-notebooks-${TAG}.zip" home.yaml)
+
+          # Full curriculum tree (markdown + YAML + slides source + PPTX + home)
+          tar --exclude='*.DS_Store' -czf "dist/curriculum-full-${TAG}.tar.gz" \
+            curriculum notebooks/home.yaml SETUP.md curriculum/README.md
+
+          ls -la dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body: |
+            ## orders-demo ${{ github.ref_name }}
+
+            **Artifacts**
+
+            - `curriculum-slides-${{ github.ref_name }}.zip` — 13 editable PPTX decks + their Marp markdown source.
+            - `curriculum-notebooks-${{ github.ref_name }}.zip` — 11 lab notebook YAMLs + the home notebook, for manual `dtctl apply` if you don't want to clone.
+            - `curriculum-full-${{ github.ref_name }}.tar.gz` — the whole teaching tree (narrative markdown + labs + slides + home notebook + setup guide). The app + k8s + scripts are not included.
+
+            See [SETUP.md](SETUP.md) for how to load the curriculum into your tenant. See [CHANGELOG.md](CHANGELOG.md) for what's new.
+          files: |
+            dist/curriculum-slides-*.zip
+            dist/curriculum-notebooks-*.zip
+            dist/curriculum-full-*.tar.gz
+          generate_release_notes: true

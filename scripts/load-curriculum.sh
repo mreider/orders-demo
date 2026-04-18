@@ -34,19 +34,21 @@ for bin in jq dtctl curl; do
 done
 
 # Collect every notebook YAML: the 11 curriculum labs + the home notebook.
-mapfile -t FILES < <(
-  find "$ROOT/curriculum" -name '*.yaml' -not -name '*.slides.md' | sort
-  ls "$ROOT/notebooks/home.yaml" 2>/dev/null || true
-)
+# Portable (POSIX sh arrays — bash 3.2 compatible on macOS).
+FILES_TMP=$(mktemp)
+find "$ROOT/curriculum" -name '*.yaml' -not -name '*.slides.md' | sort > "$FILES_TMP"
+[ -f "$ROOT/notebooks/home.yaml" ] && echo "$ROOT/notebooks/home.yaml" >> "$FILES_TMP"
 
-if [ "${#FILES[@]}" -eq 0 ]; then
+count=$(wc -l < "$FILES_TMP" | tr -d ' ')
+if [ "$count" -eq 0 ]; then
+  rm -f "$FILES_TMP"
   echo "no notebook YAMLs found under curriculum/ or notebooks/"
   exit 1
 fi
 
-log "loading ${#FILES[@]} notebooks into $DT_ENV"
+log "loading $count notebooks into $DT_ENV"
 
-for f in "${FILES[@]}"; do
+while read -r f; do
   name=$(basename "$f")
   printf '  %-60s ' "$name"
 
@@ -100,6 +102,7 @@ for f in "${FILES[@]}"; do
   esac
 
   echo "OK ($id)"
-done
+done < "$FILES_TMP"
+rm -f "$FILES_TMP"
 
 log "done. Open the Notebooks app and filter by 'Curriculum /'."
