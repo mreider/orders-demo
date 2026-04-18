@@ -42,7 +42,8 @@ public class OrderEventsListener {
         boolean bad = msg.get("bad").asBoolean();
 
         // Seeded failure: bad payloads throw and mark the transaction failed.
-        // This is the seam Rung 4 teaches: HTTP submit succeeded, Kafka consume failed.
+        // Produces the HTTP-submit-succeeded-but-Kafka-consume-failed seam
+        // surfaced in the demo notebook's messaging-family queries.
         if (bad) {
             log.warn("Rejecting bad order {}", orderId);
             throw new IllegalStateException("bad order payload: " + orderId);

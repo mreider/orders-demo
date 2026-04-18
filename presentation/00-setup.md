@@ -20,15 +20,13 @@ When we say "under SDv2", we mean the detection model. When we say "in Latest Dy
 - [`dtctl`](https://github.com/dynatrace-oss/dtctl) installed: `brew install dynatrace-oss/tap/dtctl`.
 - Platform token (or OAuth) with: `document:documents:read`, `document:documents:write`, `document:environment-shares:read`, `document:environment-shares:write`.
 
-## Load the demo notebooks
+## Load the demo notebook
 
 ```bash
 dtctl auth login
-for f in presentation/*.yaml; do
-  dtctl apply -f "$f" --write-id --share-environment
-done
+dtctl apply -f presentation/sdv2-demo.yaml --share-environment
 ```
 
-`--write-id` stamps the notebook ID back so future applies update in place. `--share-environment` makes the notebook visible tenant-wide.
+`--share-environment` makes the notebook visible tenant-wide. The YAML already carries the notebook's UUID, so re-applies update in place.
 
-Open the Notebooks app, filter by `SDv2 demo`, and run the first notebook. If results come back, you're set.
+Open the Notebooks app, filter by `SDv2 demo`, and run the preamble tenant-health check. If three workload rows come back, you're set — then run questions 1-4 for section 1 of the deck and questions 5-10 for section 2.

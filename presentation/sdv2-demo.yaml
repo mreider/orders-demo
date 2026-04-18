@@ -1,0 +1,409 @@
+id: e29c4637-1830-4a8a-acb5-08f689788bd7
+name: "SDv2 demo"
+type: notebook
+content:
+  defaultTimeframe:
+    from: now()-30m
+    to: now()
+  sections:
+    - id: 00000000-0000-0000-1100-000000000001
+      type: markdown
+      markdown: |-
+        # SDv2 demo
+
+        A migration walkthrough for Dynatrace customers moving from Service Detection v1 to Service Detection v2 on OneAgent-monitored workloads.
+
+        > **The shift in one sentence:**
+        > SDv1 creates a separate `dt.entity.service` for every controller class and Kafka listener on a single Kubernetes workload. SDv2 collapses all of them to one `UNIFIED` entity, and the per-controller / per-queue detail moves onto first-class metric dimensions (`endpoint.name`, `messaging.destination.name`, etc.).
+
+        One notebook, two parts, ten DQL questions.
+
+        **Part 1 — One workload, one service** (questions 1-4): how SDv2 collapses the `dt.service.name` and `dt.entity.service` fragmentation that SDv1 produces, and how `OTEL_SERVICE_NAME` acts as a prefix on every SDv1 fragment. [Narrative on GitHub.](https://github.com/mreider/orders-demo/blob/main/presentation/01-one-workload-one-service.md)
+
+        **Part 2 — Dimensions do the slicing** (questions 5-10): metric families, the legacy `request.*`-for-messaging overlap that goes away at SDv2-OneAgent GA, `endpoint.name`, downstreams as dimensions on the caller, and metric-first DQL. [Narrative on GitHub.](https://github.com/mreider/orders-demo/blob/main/presentation/02-dimensions-do-the-slicing.md)
+
+        Demo tenant uses `orders-sdv1` / `orders-sdv2` namespaces with workload `orders-demo` (plus `orders-demo-named` in sdv1 for the prefix comparison). Replace with your own namespace/workload to run against your tenant.
+
+    - id: 00000000-0000-0000-1100-000000000002
+      type: markdown
+      markdown: |-
+        ## Before you start: is the companion demo workload running?
+
+        The `orders-demo` Spring Boot app provides the traffic shape every question below queries for. If the answer here is empty, loadgens have stopped; re-apply `k8s/40-load.yaml` and `k8s/41-load-named.yaml` from the [repo](https://github.com/mreider/orders-demo) and wait 60 seconds.
+
+    - id: 00000000-0000-0000-1100-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries cnt = sum(dt.service.request.count),
+              by: {k8s.namespace.name, k8s.workload.name},
+              filter: matchesValue(k8s.workload.name, "orders-demo")
+                   OR matchesValue(k8s.workload.name, "orders-demo-named"),
+              from: now()-5m
+            | sort k8s.namespace.name asc, k8s.workload.name asc
+          timeframe:
+            from: now()-5m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1100-000000000004
+      type: markdown
+      markdown: |-
+        **Expected when the demo is live:**
+
+        - `orders-sdv1` + `orders-demo` — baseline SDv1 workload
+        - `orders-sdv1` + `orders-demo-named` — with `OTEL_SERVICE_NAME=orders-api`
+        - `orders-sdv2` + `orders-demo` — SDv2 detection
+
+        Three rows, traffic flowing. If you've got that, you're ready — start with Question 1 below.
+
+    - id: 00000000-0000-0000-1101-000000000001
+      type: markdown
+      markdown: |-
+        ## Question 1: How many distinct `dt.service.name` values does this workload produce?
+
+        The single-most-useful diagnostic. One row → SDv2. Three-plus rows → SDv1.
+
+    - id: 00000000-0000-0000-1101-000000000002
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch spans, from: now()-30m
+            | filter matchesValue(k8s.namespace.name, "orders-sdv1")
+                AND matchesValue(k8s.workload.name, "orders-demo")
+            | summarize span_count = count(), by: {dt.service.name}
+            | sort span_count desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1101-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch spans, from: now()-30m
+            | filter matchesValue(k8s.namespace.name, "orders-sdv2")
+                AND matchesValue(k8s.workload.name, "orders-demo")
+            | summarize span_count = count(), by: {dt.service.name}
+            | sort span_count desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1101-000000000004
+      type: markdown
+      markdown: |-
+        Read:
+
+        - SDv1 produces per-controller and per-listener fragments. Expect four rows for `orders-demo`: `orders-demo - OrderController`, `orders-demo - InventoryController`, `OrderEventsListener`, plus `orders-demo` (actuator).
+        - SDv2 collapses all of them to one row, typically `<namespace> -- <workload>`.
+        - If SDv1 shows only one row, loadgen isn't running — the actuator handler emits a single name; controllers and Kafka listeners only fragment when they actually process traffic.
+
+    - id: 00000000-0000-0000-1101-000000000005
+      type: markdown
+      markdown: |-
+        ## Question 2: How many `dt.entity.service` entities does one workload back onto?
+
+        The fragmentation isn't just naming. SDv1 creates a separate service entity per controller class and per Kafka listener.
+
+    - id: 00000000-0000-0000-1101-000000000006
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch spans, from: now()-30m
+            | filter matchesValue(k8s.namespace.name, "orders-sdv1")
+                OR matchesValue(k8s.namespace.name, "orders-sdv2")
+            | filter matchesValue(k8s.workload.name, "orders-demo")
+            | summarize
+                entities = countDistinctExact(dt.entity.service),
+                names = countDistinctExact(dt.service.name),
+                by: {k8s.namespace.name}
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1101-000000000007
+      type: markdown
+      markdown: |-
+        Read:
+
+        - `orders-sdv1` (SDv1): four entities, four names. Each controller class and the Kafka listener get their own `dt.entity.service` with independent health, baselines, and alerts.
+        - `orders-sdv2` (SDv2): one entity, one name. The per-class detail moves to metric dimensions on that single entity (question 6 onward).
+        - Both queries stay on the spans stream — `dt.entity.service` and `dt.service.name` are first-class dimensions, no entity-table join needed.
+
+    - id: 00000000-0000-0000-1101-000000000008
+      type: markdown
+      markdown: |-
+        ## Question 3: Does `service.name` fix the names?
+
+        Same image, two SDv1 workloads. Only `orders-demo-named` has `OTEL_SERVICE_NAME=orders-api` set.
+
+    - id: 00000000-0000-0000-1101-000000000009
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch spans, from: now()-30m
+            | filter matchesValue(k8s.namespace.name, "orders-sdv1")
+                AND (matchesValue(k8s.workload.name, "orders-demo")
+                     OR matchesValue(k8s.workload.name, "orders-demo-named"))
+            | summarize span_count = count(), by: {k8s.workload.name, service.name, dt.service.name}
+            | sort k8s.workload.name asc, span_count desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1101-00000000000a
+      type: markdown
+      markdown: |-
+        Read:
+
+        - `orders-demo` rows have `service.name` empty and bare `dt.service.name` fragments.
+        - `orders-demo-named` rows carry `service.name = orders-api` and every `dt.service.name` fragment is prefixed: `orders-api (orders-demo - OrderController)` etc.
+        - `service.name` is now a queryable metric dimension. `filter service.name == "orders-api"` cuts across every SDv1 fragment without an entity lookup.
+        - UI caveat: the prefix lands in metrics and spans today. `entity.name` in the Services app does not yet carry the prefix — the list-view UI update is pending.
+
+    - id: 00000000-0000-0000-1101-00000000000b
+      type: markdown
+      markdown: |-
+        ## Question 4: What does the fragmentation look like as a throughput chart?
+
+    - id: 00000000-0000-0000-1101-00000000000c
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries request_rate = sum(dt.service.request.count),
+              by: {dt.service.name},
+              filter: matchesValue(k8s.namespace.name, "orders-sdv1")
+                AND matchesValue(k8s.workload.name, "orders-demo"),
+              from: now()-30m
+            | sort arraySum(request_rate) desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1101-00000000000d
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries request_rate = sum(dt.service.request.count),
+              by: {dt.service.name},
+              filter: matchesValue(k8s.namespace.name, "orders-sdv2")
+                AND matchesValue(k8s.workload.name, "orders-demo"),
+              from: now()-30m
+            | sort arraySum(request_rate) desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1101-00000000000e
+      type: markdown
+      markdown: |-
+        Read: SDv1 shows multiple lines, one per controller class. SDv2 shows one line. Identical traffic; just different modelling.
+
+    - id: 00000000-0000-0000-1102-000000000001
+      type: markdown
+      markdown: |-
+        # Part 2 — Dimensions do the slicing
+
+        Under SDv2 the per-endpoint and per-downstream detail moves onto metric dimensions of the one service entity. Questions 5-9 exercise that shift.
+
+    - id: 00000000-0000-0000-1102-000000000002
+      type: markdown
+      markdown: |-
+        ## Question 5: What metric families does this service produce?
+
+        Three families cover entry-point activity: HTTP/gRPC requests, messaging consumption, FaaS invocations. The UI's **Transactions** column is the coalesced sum.
+
+    - id: 00000000-0000-0000-1102-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries {
+              requests = sum(dt.service.request.count),
+              messaging = sum(dt.service.messaging.process.count),
+              faas = sum(dt.service.faas_invoke.count)
+            },
+            filter: matchesValue(k8s.namespace.name, "orders-sdv2")
+              AND matchesValue(k8s.workload.name, "orders-demo"),
+            from: now()-30m
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1102-000000000004
+      type: markdown
+      markdown: |-
+        Read: `orders-demo` populates `request.*` (k6 hitting /orders, /inventory) and `messaging.process.*` (Kafka consume on `order-events`). `faas_invoke.*` stays empty — no Lambda here.
+
+    - id: 00000000-0000-0000-1102-000000000020
+      type: markdown
+      markdown: |-
+        ## Question 6: Where does the legacy `request.*`-for-messaging overlap show up?
+
+        Kafka consume activity currently double-counts: it shows up in both `dt.service.request.*` (a legacy behavior from before dedicated messaging families existed) and `dt.service.messaging.process.*` (the modern home). Goes away when SDv2 for OneAgent GAs in **June 2026** — `request.*` will then be HTTP-only.
+
+    - id: 00000000-0000-0000-1102-000000000021
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries {
+              as_request = sum(dt.service.request.count),
+              as_messaging = sum(dt.service.messaging.process.count)
+            },
+            filter: dt.service.name == "OrderEventsListener"
+              AND k8s.namespace.name == "orders-sdv1",
+            from: now()-30m
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1102-000000000022
+      type: markdown
+      markdown: |-
+        Read: both series track each other at the same rate. Same Kafka consumes, counted twice under two families. On `request.*` the `endpoint.name` shows as `NON_KEY_REQUESTS` — a Classic artifact visible nowhere else. Don't sum families in alerts until SDv2-for-OA GA.
+
+    - id: 00000000-0000-0000-1102-000000000005
+      type: markdown
+      markdown: |-
+        ## Question 7: Split the requests by `endpoint.name`.
+
+        In SDv1 you'd switch between per-controller entities. In SDv2 it's one entity, split by dimension.
+
+    - id: 00000000-0000-0000-1102-000000000006
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries req = sum(dt.service.request.count),
+              by: {endpoint.name, http.request.method},
+              filter: matchesValue(k8s.namespace.name, "orders-sdv2")
+                AND matchesValue(k8s.workload.name, "orders-demo"),
+              from: now()-30m
+            | sort arraySum(req) desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1102-000000000007
+      type: markdown
+      markdown: |-
+        Read: endpoints show as `GET /*`, `POST /*` — the fallback name used when `http.route` isn't set on server spans (Spring MVC + OneAgent on this build). Throughput is right, labels are not. Fix with URL path-pattern matching today, or wait for automatic URL normalization (rolling out Classic-first, then SDv2 opt-in).
+
+    - id: 00000000-0000-0000-1102-000000000008
+      type: markdown
+      markdown: |-
+        ## Question 8: Messaging as a dimension, not an entity.
+
+        The Kafka consumer doesn't get its own service row under SDv2. It's a `messaging.process.*` metric on the caller, split by `messaging.destination.name`.
+
+    - id: 00000000-0000-0000-1102-000000000009
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries msg = sum(dt.service.messaging.process.count),
+              by: {messaging.destination.name, messaging.system},
+              filter: matchesValue(k8s.namespace.name, "orders-sdv2")
+                AND matchesValue(k8s.workload.name, "orders-demo"),
+              from: now()-30m
+            | sort arraySum(msg) desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1102-00000000000a
+      type: markdown
+      markdown: |-
+        Read: one row, `messaging.destination.name = order-events`, `messaging.system = kafka`. Under SDv1 the same activity showed up as a separate `OrderEventsListener` service row (seen in question 1).
+
+    - id: 00000000-0000-0000-1102-00000000000b
+      type: markdown
+      markdown: |-
+        ## Question 9: Downstream DB calls as dimensions on the caller.
+
+        JDBC calls don't get their own entity. They're client spans on the calling service, dimensioned by `server.address` / `db.operation.name`.
+
+    - id: 00000000-0000-0000-1102-00000000000c
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch spans, from: now()-30m
+            | filter matchesValue(k8s.namespace.name, "orders-sdv2")
+                AND matchesValue(k8s.workload.name, "orders-demo")
+                AND span.kind == "client"
+            | summarize span_count = count(), by: {server.address, db.operation.name, db.system.name}
+            | sort span_count desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1102-00000000000d
+      type: markdown
+      markdown: |-
+        Read: client spans to `postgres` on port 5432 with `db.operation.name` values (SELECT, INSERT, UPDATE). Under Classic this would have been a separate `DATABASE_SERVICE` entity; here it's a facet of the calling service.
+
+    - id: 00000000-0000-0000-1102-00000000000e
+      type: markdown
+      markdown: |-
+        ## Question 10: Metric-first vs entity-first DQL.
+
+        Same question — requests per endpoint on `orders-sdv2 -- orders-demo` — written two ways. The Latest shape stays on the metric stream and uses `dt.service.name` as a dimension; no entity-table fetch required.
+
+    - id: 00000000-0000-0000-1102-00000000000f
+      type: dql
+      state:
+        input:
+          value: |-
+            // Classic shape: lookup via dt.entity.service
+            fetch dt.entity.service
+            | filter entity.name == "orders-sdv2 -- orders-demo"
+            | fields dt.entity.service = id
+            | lookup [timeseries req = sum(dt.service.request.count),
+                        by: {endpoint.name, dt.entity.service}, from: now()-30m],
+                sourceField: dt.entity.service, lookupField: dt.entity.service
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1102-000000000010
+      type: dql
+      state:
+        input:
+          value: |-
+            // Latest shape: filter on the metric dimension directly
+            timeseries req = sum(dt.service.request.count),
+              by: {endpoint.name},
+              filter: dt.service.name == "orders-sdv2 -- orders-demo",
+              from: now()-30m
+            | sort arraySum(req) desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1102-000000000011
+      type: markdown
+      markdown: |-
+        Read: same answer. Fewer lines, fewer scanned records, and stable across entity re-detection — dimension values don't change when entity IDs do.

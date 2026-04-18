@@ -82,16 +82,15 @@ To see SDv2 on your own workload you need both: a Latest tenant *and* SDv2 opted
 
 ---
 
-# Load the demo notebooks
+# Load the demo notebook
 
 ```bash
 dtctl auth login
 
-for f in presentation/*.yaml; do
-  dtctl apply -f "$f" --write-id --share-environment
-done
+dtctl apply -f presentation/sdv2-demo.yaml \
+  --share-environment
 ```
 
-- `--write-id` stamps the notebook ID back so future applies update in place
-- `--share-environment` makes the notebook visible tenant-wide
-- Open the Notebooks app, filter by `SDv2 demo`, run the first notebook
+- One notebook: preamble + tenant-health check + 10 DQL questions
+- YAML carries the UUID, so re-applies update in place
+- Open the Notebooks app, filter by `SDv2 demo`, run the preamble check, then questions 1-10

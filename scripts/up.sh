@@ -106,8 +106,8 @@ for ns in orders-sdv1 orders-sdv2; do
 done
 
 log "Applying app Deployments (image: ${ORDERS_IMAGE})"
-envsubst < "${ROOT}/k8s/30-app.yaml"       | kubectl apply -f -
-envsubst < "${ROOT}/k8s/31-app-named.yaml" | kubectl apply -f -
+envsubst '${ORDERS_IMAGE}' < "${ROOT}/k8s/30-app.yaml"       | kubectl apply -f -
+envsubst '${ORDERS_IMAGE}' < "${ROOT}/k8s/31-app-named.yaml" | kubectl apply -f -
 
 for ns in orders-sdv1 orders-sdv2; do
   kubectl -n "${ns}" rollout status deployment/orders-demo --timeout=300s
@@ -141,13 +141,13 @@ Next steps (manual):
 
 2. Wait ~5 minutes for the UNIFIED entity to appear.
 
-3. Load the demo notebooks into your tenant:
+3. Load the demo notebook into your tenant:
    export DT_ENV=https://<your-tenant>.apps.dynatrace.com
    export DT_PLATFORM_TOKEN=dt0s16.XXXX...
    ./scripts/load-demos.sh
 
 4. Walk the presentation:
-   Notebooks app > filter "Curriculum /" > Module 0 > run in order.
+   Notebooks app > filter "SDv2 demo" > open "SDv2 demo" > run questions 1-10 in order.
 
 Teardown: ./scripts/down.sh
 ======================================================================

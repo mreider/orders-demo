@@ -11,32 +11,24 @@ I put together a short presentation plus a set of live demos that run against yo
 
 ## The shift in one sentence
 
-Under SDv1, one Kubernetes workload typically tags its spans with several distinct `dt.service.name` values (one per controller class, one per Kafka listener, one aggregate). Under SDv2, one workload produces one `dt.service.name`, and the per-endpoint or per-queue detail moves onto first-class query dimensions like `endpoint.name` and `messaging.destination.name`.
+Under SDv1, one Kubernetes workload fragments into multiple service entities — one per controller class, one per Kafka listener, plus an actuator entity — each with its own name, its own health, its own baselines. Under SDv2, one workload is one `UNIFIED` service entity with one `dt.service.name`, and the per-endpoint or per-queue detail moves onto first-class metric dimensions like `endpoint.name` and `messaging.destination.name`.
 
-The entity graph already consolidated to one WEB_REQUEST_SERVICE per workload on modern Grail tenants. What SDv2 specifically collapses is the `dt.service.name` fragmentation that SDv1 still produces on top of that entity.
+The bigger point: SDv1 multiplies entities for things that don't really exist as separate workloads. SDv2 keeps one entity and uses **metric families** and **transactions** to measure different aspects of its health on the same workload.
 
 ## Why it matters
 
-- **One health signal per workload**, not one per controller class. Alerts, baselines, and dashboards scope to the thing you actually deploy.
-- **Queries shorten**. Group by `endpoint.name` on one entity instead of joining across a dozen WEB_SERVICE rows.
+- **One health signal per workload**, not four. Alerts, baselines, and dashboards scope to the thing you actually deploy.
+- **Queries shorten**. Group by `endpoint.name` on one entity instead of joining across a handful of fragment entities.
 - **Downstream dependencies move with the caller**. Databases, Kafka queues, third-party HTTP don't appear as separate entities. They're tabs on the calling service, rich with per-downstream dimensions.
 
 ## What the presentation covers
 
-Twelve short sections, each with a live demo notebook:
+Two short sections, one unified demo notebook with ten DQL questions:
 
-- One workload, one service: counting `dt.service.name` values on a workload.
-- The three transport families: HTTP, messaging, FaaS metrics.
-- Dimensions, not entities: per-endpoint slicing without entity joins.
-- SDv1 vs SDv2, side by side: same app, two namespaces, one detection difference.
-- Where names come from: the resource-attribute fallback chain.
-- The `service.name` fix: the workaround that works today for Classic services you own.
-- Every endpoint baselined: SDv2's endpoint-level SLO guarantee.
-- When `http.route` is missing: why you see `GET /*`, and what to do about it.
-- Downstreams are tabs, not entities: the caller-side dimensional model.
-- What's coming: pipeline-side naming and SERVICE_DEPLOYMENT for per-environment views.
+- **One workload, one service** — count `dt.service.name` and `dt.entity.service` values per workload, see SDv1's entity fragmentation and SDv2's `UNIFIED` collapse, watch `OTEL_SERVICE_NAME` act as a prefix on every SDv1 fragment.
+- **Dimensions do the slicing** — the three metric families (`request`, `messaging.process`, `faas_invoke`) that roll up as the **Transactions** column, the legacy `request.*`-for-messaging double-count that disappears when SDv2 for OneAgent GAs in June 2026, `endpoint.name` with the `http.route` gap, downstreams as dimensions on the caller, and the metric-first DQL shift Christian flagged in review.
 
-Demo notebooks run on your own Dynatrace data. No sample backend needed (unless you don't have a workload with the right shape, in which case there's a Spring Boot app in the repo that produces the necessary traffic).
+Demo notebook runs on your own Dynatrace data. No sample backend needed (unless you don't have a workload with the right shape, in which case there's a Spring Boot app in the repo that produces the necessary traffic).
 
 ## Try it
 

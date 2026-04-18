@@ -33,7 +33,7 @@ fi
 
 log() { printf '\n\033[1;36m[build] %s\033[0m\n' "$*"; }
 
-# Order: 00-setup first, then 01-... through 11-whats-coming, numerically.
+# Order: 00-setup, 01-one-workload-one-service, 02-dimensions-do-the-slicing.
 # find | sort gives this naturally.
 FILES=()
 while IFS= read -r -d '' f; do FILES+=("$f"); done < <(

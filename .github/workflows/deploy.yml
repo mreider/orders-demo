@@ -67,8 +67,9 @@ jobs:
 
       - name: Apply app Deployments (with image substitution)
         run: |
-          envsubst < k8s/30-app.yaml       | kubectl apply -f -
-          envsubst < k8s/31-app-named.yaml | kubectl apply -f -
+          : "${ORDERS_IMAGE:?ORDERS_IMAGE must be set by the 'Resolve image ref' step}"
+          envsubst '${ORDERS_IMAGE}' < k8s/30-app.yaml       | kubectl apply -f -
+          envsubst '${ORDERS_IMAGE}' < k8s/31-app-named.yaml | kubectl apply -f -
           for ns in orders-sdv1 orders-sdv2; do
             kubectl -n "$ns" rollout status deployment/orders-demo --timeout=300s
           done

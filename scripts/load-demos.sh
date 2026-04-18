@@ -34,11 +34,10 @@ for bin in jq dtctl curl; do
   command -v "$bin" >/dev/null || { echo "missing dependency: $bin"; exit 1; }
 done
 
-# Collect every notebook YAML: the 10 demo notebooks + the home notebook.
+# Collect every notebook YAML under presentation/.
 # Portable (POSIX sh arrays — bash 3.2 compatible on macOS).
 FILES_TMP=$(mktemp)
 find "$ROOT/presentation" -name '*.yaml' -not -name '*.slides.md' | sort > "$FILES_TMP"
-[ -f "$ROOT/notebooks/home.yaml" ] && echo "$ROOT/notebooks/home.yaml" >> "$FILES_TMP"
 
 count=$(wc -l < "$FILES_TMP" | tr -d ' ')
 if [ "$count" -eq 0 ]; then
@@ -106,4 +105,4 @@ while read -r f; do
 done < "$FILES_TMP"
 rm -f "$FILES_TMP"
 
-log "done. Open the Notebooks app and filter by 'Curriculum /'."
+log "done. Open the Notebooks app and filter by 'SDv2 demo'."

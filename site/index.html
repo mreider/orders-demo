@@ -137,63 +137,55 @@
 
 <h1>orders-demo <span class="tag">/ SDv1 to SDv2 for OneAgent</span></h1>
 <p class="sub">
-  A Spring Boot app plus a presentation on the Service Detection v1 to v2
-  migration for OneAgent-monitored workloads. SDv2 for OneAgent is available only
-  on Latest Dynatrace tenants. Demos run against your own tenant.
+  One Kubernetes workload, one Dynatrace service — a live walkthrough of what Service Detection v2 actually changes, run against your own Latest Dynatrace tenant in about thirty minutes.
 </p>
 
 <p>
   <a class="cta" href="https://github.com/mreider/orders-demo">View on GitHub</a>
   <a class="cta alt" href="https://github.com/mreider/orders-demo/blob/main/SETUP.md">Setup guide</a>
-  <a class="cta alt" href="https://github.com/mreider/orders-demo/blob/main/presentation/README.md">Presentation outline</a>
 </p>
 
-<h2>The flow</h2>
+<h2>The shift</h2>
+<p>
+  SDv1 creates a separate Dynatrace service for every REST controller class and every Kafka listener on a single Kubernetes workload. A Spring Boot app with two controllers and one consumer becomes <em>four</em> services in the UI, each carrying its own health, baselines, and alerts. SDv2 collapses that to one <code>UNIFIED</code> service entity and pushes the per-controller and per-queue detail onto metric dimensions. Four things to monitor become one, and every slice you used to navigate to is now a query away.
+</p>
+
+<h2>The walkthrough</h2>
 <div class="units">
   <div class="unit">
-    <h3>Part 1: what is a service, really?</h3>
-    <p>Entity-first to attribute-first. The workload as the unit. Three transport families. Where SDv1's <code>dt.service.name</code> fragmentation lives, and how SDv2 collapses it.</p>
+    <h3>Section 1 — What changes</h3>
+    <p>
+      A single DQL query tells the whole story: four <code>dt.entity.service</code> entities under SDv1, one <code>UNIFIED</code> entity under SDv2. A second companion workload shows how <code>OTEL_SERVICE_NAME</code> behaves — as a prefix on every SDv1 fragment, and as the outright name on SDv2.
+    </p>
   </div>
   <div class="unit">
-    <h3>Part 2: naming and identity</h3>
-    <p>Where service names come from, the metric-first query shift, and the <code>service.name</code> fix for Classic services you own today.</p>
-  </div>
-  <div class="unit">
-    <h3>Part 3: endpoints, dependencies, and what's next</h3>
-    <p>Every endpoint baselined, the <code>http.route</code> gap and the automatic fix that's coming, downstreams as tabs, and the pipeline-side naming plus <code>SERVICE_DEPLOYMENT</code> direction.</p>
+    <h3>Section 2 — How you use it</h3>
+    <p>
+      Three metric families coalesced as the <strong>Transactions</strong> column. Databases and queues surface as dimensions on the caller, not as separate service entities. Metric-first DQL skips the entity-table join entirely. Plus a look at what changes when SDv2 for OneAgent reaches GA in June 2026.
+    </p>
   </div>
 </div>
 
-<h2>How it works</h2>
-<p>
-  The presentation is sections, each with a short narrative, a slide deck, and a demo notebook
-  that runs against your own Dynatrace tenant. A companion Spring Boot app fills in when
-  the tenant doesn't already have a workload with the right shape.
-</p>
-
+<h2>What's in the repo</h2>
 <table>
   <tr><th>Component</th><th>What it is</th></tr>
-  <tr><td><code>app/</code></td><td class="m">Spring Boot monolith: two controllers, a Kafka consumer, a JDBC client</td></tr>
-  <tr><td><code>k8s/</code></td><td class="m">Manifests: two namespaces, Postgres + Redpanda per side, two app deployments in Classic + one in Latest, two loadgens</td></tr>
-  <tr><td><code>presentation/</code></td><td class="m">Presentation sections (markdown + demo notebook YAML + per-section Marp slides) plus one consolidated editable PPTX</td></tr>
-  <tr><td><code>scripts/up.sh</code></td><td class="m">Brings up the whole stack on GKE in one command</td></tr>
-  <tr><td><code>scripts/load-demos.sh</code></td><td class="m">Loads every demo notebook into your tenant with an environment share</td></tr>
+  <tr><td><code>app/</code></td><td class="m">A small Spring Boot app — two REST controllers, a Kafka consumer, a JDBC client.</td></tr>
+  <tr><td><code>k8s/</code></td><td class="m">Manifests for two namespaces on one GKE cluster, SDv1 and SDv2 side-by-side, with Postgres, Redpanda, and a k6 loadgen per side.</td></tr>
+  <tr><td><code>presentation/</code></td><td class="m">Two-section narrative, Marp slides built to a single editable PPTX, and the unified <code>sdv2-demo.yaml</code> notebook with ten DQL questions.</td></tr>
+  <tr><td><code>scripts/</code></td><td class="m"><code>up.sh</code> brings the stack up on GKE; <code>load-demos.sh</code> loads the notebook into your tenant with an environment share.</td></tr>
 </table>
 
 <h2>Quick start</h2>
-<pre><code># After you've set the required env vars (see SETUP.md):
-./scripts/up.sh
-./scripts/load-demos.sh</code></pre>
+<pre><code># After you've set the DT_* env vars (see SETUP.md):
+./scripts/up.sh           # create the GKE cluster, deploy the app
+./scripts/load-demos.sh   # load the demo notebook into your tenant</code></pre>
 <p>
-  Full prerequisites (GKE, Dynatrace tokens, dtctl) in the
-  <a href="https://github.com/mreider/orders-demo/blob/main/SETUP.md">setup guide</a>.
+  Full prerequisites — GKE, Dynatrace tokens, dtctl — are in the <a href="https://github.com/mreider/orders-demo/blob/main/SETUP.md">setup guide</a>.
 </p>
 
 <h2>Releases</h2>
 <p>
-  Each tagged release bundles the presentation as three artifacts on the
-  <a href="https://github.com/mreider/orders-demo/releases">releases page</a>:
-  the consolidated slide deck (PPTX), the demo notebooks (YAML), and the full presentation tree (tarball).
+  Each tag bundles the slide deck, the demo notebook YAML, and the full presentation tree on the <a href="https://github.com/mreider/orders-demo/releases">releases page</a>.
 </p>
 
 <hr class="grad">

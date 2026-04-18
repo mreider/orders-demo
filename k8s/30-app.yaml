@@ -32,7 +32,7 @@ spec:
     spec:
       containers:
         - name: orders-demo
-          image: ${ORDERS_IMAGE:-ghcr.io/mreider/orders-demo:latest}
+          image: ${ORDERS_IMAGE}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -88,7 +88,7 @@ spec:
     spec:
       containers:
         - name: orders-demo
-          image: ${ORDERS_IMAGE:-ghcr.io/mreider/orders-demo:latest}
+          image: ${ORDERS_IMAGE}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

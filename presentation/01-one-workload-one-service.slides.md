@@ -28,44 +28,75 @@ style: |
 
 ---
 
-# The point
+# The setup
 
-One Kubernetes workload should produce one service name. That's true under SDv2. Under SDv1, the same workload fragments into many names.
+Same app, two namespaces, one cluster, one OneAgent.
 
-- **SDv2**: one `dt.service.name` per workload, backed by a `UNIFIED` entity
-- **SDv1**: 4-7 `dt.service.name` values per workload, all backed by one `WEB_REQUEST_SERVICE` entity
-- Same spans, same traffic. Only the name layer differs.
+| Namespace | Detection |
+|---|---|
+| `orders-sdv1` | SDv1 (default, K8s-aware) |
+| `orders-sdv2` | SDv2 (opted in per namespace) |
+
+Identical pods, identical traffic. Any difference is a detection-model difference.
 
 ---
 
-# Where the SDv1 fragmentation comes from
+# What the two models produce
 
-A Spring Boot app with two REST controllers plus a Kafka consumer emits names like:
+One Kubernetes workload →
 
-- `<workload>` (aggregate)
-- `<workload> - OrderController` (per controller class)
-- `<workload> - InventoryController` (per controller class)
-- `OrderEventsListener` (the Kafka consumer)
+| Detection | Distinct names | Distinct entities |
+|---|---|---|
+| **SDv1** | 4: `orders-demo - OrderController`, `orders-demo - InventoryController`, `OrderEventsListener`, `orders-demo` | **4 separate `dt.entity.service`** |
+| **SDv2** | 1: `orders-sdv2 -- orders-demo` | **1 `UNIFIED` entity** |
 
-All pointing at one `dt.entity.service`. The entity graph consolidated long ago. The `dt.service.name` layer did not.
+SDv1 creates **separate service entities** for each controller class and the Kafka listener — four services for one workload, one pod, one process.
+
+---
+
+# The core shift
+
+- SDv1: multiplies entities for things that don't really exist as separate workloads
+- SDv2: one entity; metric families and dimensions measure different aspects of its health on the same workload
+- Per-class detail doesn't disappear — moves onto `endpoint.name`, `messaging.destination.name` (next section)
 
 ---
 
 # Why the fragmentation matters
 
-- Queries filtered by `dt.service.name` see each fragment as a separate identity
-- Health and alerts scoped to a name end up per-class, not per-workload
-- Dashboards and SLOs inherit the split
-
-SDv2 pushes per-class granularity onto first-class dimensions (`endpoint.name`, `messaging.destination.name`) so the name layer stays one-per-workload.
+- Each SDv1 fragment has its own health, baselines, and alerts — four services to monitor per workload
+- Queries filtered by `dt.service.name` or by `dt.entity.service` see each fragment as a separate identity
+- Dashboards, SLOs, and alerting rules inherit the split — maintained four times for one workload
 
 ---
 
-# See it in the Services app
+# The `service.name` knob works on both models
 
-- Filter by your workload's name
-- **SDv2**: one row, `serviceType = UNIFIED`
-- **SDv1**: multiple rows like `orders-demo - OrderController`, even though they share one underlying entity
-- Each fragmented row has its own health, baselines, and alerts. That's the cost the SDv2 collapse removes.
+Set `OTEL_SERVICE_NAME` on the container. The 2026-Q1 detection-layer fix **prefixes every SDv1 fragment** with the chosen name:
 
-**Demo: One workload, one service** (`01-one-workload-one-service.yaml`)
+| Workload | `OTEL_SERVICE_NAME` | `dt.service.name` values |
+|---|---|---|
+| `orders-demo` | unset | `orders-demo - OrderController` + 2 siblings |
+| `orders-demo-named` | `orders-api` | `orders-api (orders-demo - OrderController)` + 2 siblings |
+
+- `service.name` is now a first-class metric dimension: `filter service.name == "orders-api"` works, no lookup
+- Under SDv2 the same env var replaces the default `<namespace> -- <workload>` name outright
+
+---
+
+# The UI caveat
+
+- Prefix lands in **metrics and spans today** — DQL, alerts, dashboards all see it
+- `entity.name` in the Services app **does not yet** carry the prefix — list UI update is pending
+- Classic's entity fragmentation also still there; `service.name` fixes *naming and queryability*, not entity consolidation (that's what SDv2 does)
+
+---
+
+# See it live
+
+**Demo: SDv2 demo** (`sdv2-demo.yaml`) — Questions 1-4
+
+1. Count distinct `dt.service.name` per workload
+2. Check `serviceType`: `WEB_REQUEST_SERVICE` vs `UNIFIED`
+3. Compare `orders-demo` and `orders-demo-named` — same fragmentation, prefixed on the named side
+4. Split request throughput by `dt.service.name` — SDv1 many lines, SDv2 one

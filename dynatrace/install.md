@@ -87,19 +87,21 @@ In the Dynatrace UI:
 Leave `orders-sdv1` on default (SDv1) behavior.
 
 Screenshot guidance: capture the settings toggle before and after flipping
-it - useful for the docs/03 rung discussion later.
+it — handy when narrating section 1 of the presentation.
 
 **Verify the asymmetry:**
 
-- Under **Services**, you should start to see two different detections for the
-  same `orders-demo` Deployment - one per namespace.
-- `orders-sdv1`: classic process-group-based detection. Likely one service
-  whose name reflects the Tomcat process and port.
-- `orders-sdv2`: SDv2 detection. The service name will be `orders-demo`
-  (the Deployment / `k8s.workload.name`). Endpoints baselined automatically.
+- Under **Services**, you should start to see different detections for the
+  same `orders-demo` Deployment in each namespace.
+- `orders-sdv1`: SDv1 produces a separate service entity per REST controller
+  class and per Kafka listener — four rows for this app (`OrderController`,
+  `InventoryController`, `OrderEventsListener`, plus the actuator handler).
+- `orders-sdv2`: SDv2 collapses all of the above into one `UNIFIED` entity
+  named `orders-sdv2 -- orders-demo`. Endpoints baselined automatically.
 
-Baselines need ~15 minutes of traffic to form. The load generator Job
-runs 30 minutes by default, which is plenty.
+Baselines need ~15 minutes of traffic to form. The k6 load-generator Jobs
+run 30 minutes by default, which is plenty. Re-apply `k8s/40-load.yaml` /
+`k8s/41-load-named.yaml` if you want to keep traffic flowing past that.
 
 ## 6. Teardown
 

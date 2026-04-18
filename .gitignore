@@ -11,5 +11,5 @@ scripts/capture.js
 # PowerPoint opens a ~$file.pptx lock file in the same dir; never commit it.
 ~$*.pptx
 
-# PPTX files under curriculum/ are checked in (see scripts/build-slides.sh).
-!curriculum/**/*.pptx
+# The built PPTX under presentation/ is checked in (see scripts/build-slides.sh).
+!presentation/**/*.pptx

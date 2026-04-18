@@ -44,7 +44,8 @@ export function ordersSearch() {
 
 export function ordersSubmit() {
   // 2% of submits are seeded as "bad" - the Kafka consumer will reject them.
-  // This is the seam Rung 4 teaches.
+  // This produces the HTTP-submit-OK-but-Kafka-consume-fails seam used in
+  // the demo notebook's messaging-family queries.
   const bad = Math.random() < 0.02;
   const body = JSON.stringify({
     sku: pickSku(),

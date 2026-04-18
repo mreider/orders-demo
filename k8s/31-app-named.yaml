@@ -1,20 +1,17 @@
 # Second workload in the orders-sdv1 namespace, identical image + config
-# to orders-demo, but with OTEL_SERVICE_NAME set. This exists to teach the
-# service.name story (Curriculum Module 2.3): two otherwise-identical
-# workloads side-by-side, one with a resource attribute that overrides the
-# fallback naming and one without.
+# to orders-demo, but with OTEL_SERVICE_NAME set. This powers the
+# `service.name` prefix demo in section 1 of the presentation: two
+# otherwise-identical workloads side-by-side, one with a resource
+# attribute that participates in the naming chain and one without.
 #
-# The learner sees the effect in three places:
-#   1. Entity display name   - "orders-api (orders-demo-named)" vs "orders-demo"
-#      (the "orders-api" prefix comes from a 2026-Q1 detection-layer fix
-#       that prefixes the detected Classic name with service.name when set)
-#   2. Metric dimension      - service.name == "orders-api" on dt.service.*
-#   3. Query ergonomics      - filter: service.name == "orders-api" works,
-#                              no entity-table lookup needed
+# The detection-layer prefix fix (shipped 2026-Q1) prefixes every SDv1
+# `dt.service.name` fragment with the configured service.name, producing
+# values like `orders-api (orders-demo - OrderController)` on metrics
+# and spans. `entity.name` in the Services app does not yet carry the
+# prefix — list-view UI update is still pending.
 #
-# Both OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES are set - OneAgent and
-# the OTel autoinstrumentation that ships with it both respect these env vars
-# when the app emits traces through the OTel pipeline.
+# Both OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES are set so OneAgent
+# and the OTel autoinstrumentation that ships with it both pick them up.
 apiVersion: v1
 kind: Service
 metadata:
@@ -44,7 +41,7 @@ spec:
     spec:
       containers:
         - name: orders-demo-named
-          image: ${ORDERS_IMAGE:-ghcr.io/mreider/orders-demo:latest}
+          image: ${ORDERS_IMAGE}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

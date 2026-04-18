@@ -113,11 +113,17 @@ dtctl auth login   # if not already
 dtctl query 'fetch dt.entity.service | filter contains(entity.name, "orders") | fields id, entity.name, serviceType'
 ```
 
-Expected: one row with `serviceType = UNIFIED` named `orders-sdv2 -- orders-demo`, plus a `WEB_REQUEST_SERVICE` entity for the `orders-sdv1` side (modern K8s-aware SDv1 produces one entity per workload; the per-class fragmentation sits on the `dt.service.name` dimension, not on separate entities).
+Expected: one row with `serviceType = UNIFIED` named `orders-sdv2 -- orders-demo` for the SDv2 side, plus **four `WEB_REQUEST_SERVICE` rows** for the `orders-sdv1` side — one per REST controller class, one for the Kafka listener, and one for the actuator handler (SDv1 creates separate entities per controller/listener; SDv2 collapses them to one `UNIFIED` entity).
 
-## 4. Load the demo notebooks
+To see every SDv1 fragment entity you'll need to broaden the filter — the controller/listener entity names don't contain "orders":
 
-The 10 demo notebooks and the home notebook live in `presentation/` and `notebooks/`. To load them into your tenant as environment-shared (`isPrivate: false`) notebooks, use the wrapper script:
+```bash
+dtctl query 'fetch spans, from: now()-15m | filter matchesValue(k8s.namespace.name, "orders-sdv1") and matchesValue(k8s.workload.name, "orders-demo") | summarize span_count = count(), by: {dt.entity.service, dt.service.name}'
+```
+
+## 4. Load the demo notebook
+
+The unified demo notebook (`presentation/sdv2-demo.yaml`) loads into your tenant as an environment-shared (`isPrivate: false`) notebook via the wrapper script:
 
 ```bash
 export DT_ENV="https://abc12345.apps.dynatrace.com"
@@ -141,9 +147,7 @@ Steps 2 and 3 exist because upstream `dtctl` currently lacks a `--share-environm
 If you've built dtctl from [PR #165](https://github.com/dynatrace-oss/dtctl/pull/165), skip the wrapper:
 
 ```bash
-for f in presentation/*.yaml notebooks/home.yaml; do
-  dtctl apply -f "$f" --write-id --share-environment
-done
+dtctl apply -f presentation/sdv2-demo.yaml --share-environment
 ```
 
 That's equivalent. The wrapper just backfills the two extra API calls `--share-environment` makes.
@@ -152,13 +156,11 @@ That's equivalent. The wrapper just backfills the two extra API calls `--share-e
 
 Open the Dynatrace **Notebooks** app. Filter by `SDv2 demo`. You should see:
 
-- `SDv2 demo / 01 One workload, one service`
-- ... through `SDv2 demo / 10 Downstreams are tabs, not entities`
-- `SDv2 demo / Home`
+- `SDv2 demo` — the unified demo notebook with ten DQL questions
 
 Each is marked as shared with the environment (icon indicator in the notebooks list).
 
-Open any demo and run its first query. If data comes back, you're ready. Walk them in order to follow the presentation, or pick one to answer a specific question.
+Open `SDv2 demo` and run question 1. If data comes back, you're ready. Questions 1-4 cover section 1 (one workload, one service); questions 5-10 cover section 2 (dimensions do the slicing).
 
 ## Teardown
 
