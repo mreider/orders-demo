@@ -10,28 +10,14 @@ content:
       markdown: |-
         # Module 2.3 - The service.name workaround
 
-        *Unit 2: Naming and identity - Module 3 of 4.*
-
-        This lab uses the companion demo's `orders-sdv1` namespace, which
-        runs two Classic-detected workloads that differ only in one
-        environment variable:
-
-        - `orders-demo` - no `OTEL_SERVICE_NAME` set.
-        - `orders-demo-named` - `OTEL_SERVICE_NAME=orders-api` set.
-
-        Same image, same traffic, same Classic detection mode. The queries
-        below show exactly what that one env var buys you.
-
-        If you're running against your own tenant with a pair of
-        similar workloads, substitute their names throughout.
+        Uses `orders-sdv1` with two Classic workloads that differ only in one env var:
+        - `orders-demo` - no `OTEL_SERVICE_NAME`
+        - `orders-demo-named` - `OTEL_SERVICE_NAME=orders-api`
 
     - id: 00000000-0000-0000-2303-000000000002
       type: markdown
       markdown: |-
         ## Question 1: Is service.name on the spans?
-
-        Baseline expectation: the named workload has service.name on its
-        spans, the other doesn't.
 
     - id: 00000000-0000-0000-2303-000000000003
       type: dql
@@ -51,21 +37,14 @@ content:
     - id: 00000000-0000-0000-2303-000000000004
       type: markdown
       markdown: |-
-        **Read the result:**
-
-        - `orders-demo` rows have `service.name` empty.
-        - `orders-demo-named` rows have `service.name = orders-api`.
-
-        That's the span-level effect. One env var, propagated onto every
-        span emitted by the workload.
+        Read:
+        - `orders-demo` rows: `service.name` empty.
+        - `orders-demo-named` rows: `service.name = orders-api`.
 
     - id: 00000000-0000-0000-2303-000000000005
       type: markdown
       markdown: |-
         ## Question 2: Is service.name a queryable metric dimension?
-
-        The span-level attribute gets propagated to the extracted metrics.
-        That's what makes it queryable via `by: {service.name}`.
 
     - id: 00000000-0000-0000-2303-000000000006
       type: dql
@@ -85,25 +64,14 @@ content:
     - id: 00000000-0000-0000-2303-000000000007
       type: markdown
       markdown: |-
-        **Read the result:**
-
-        For `orders-demo-named`, you can now write
-        `filter: matchesValue(service.name, "orders-api")` and get clean
-        results without any entity lookup. For `orders-demo`,
-        `service.name` is empty, and you're back to entity-joined DQL.
-
-        This is the query-ergonomics win. It ships the moment you set
-        the env var.
+        Read:
+        - Named workload: `service.name` value is queryable.
+        - Unnamed: `service.name` empty, still need entity-joined DQL.
 
     - id: 00000000-0000-0000-2303-000000000008
       type: markdown
       markdown: |-
         ## Question 3: Is dt.service.name prefixed?
-
-        Christian Praher-Koeppl's detection-layer fix (2026-03-05) checks
-        for service.name as a resource attribute. If present, it prefixes
-        the Classic detection name with the service.name value in the
-        `dt.service.name` dimension.
 
     - id: 00000000-0000-0000-2303-000000000009
       type: dql
@@ -124,28 +92,14 @@ content:
     - id: 00000000-0000-0000-2303-00000000000a
       type: markdown
       markdown: |-
-        **Read the result:**
-
-        - `orders-demo` (no service.name): `dt.service.name` =
-          `orders-demo - OrderController`, `orders-demo - InventoryController`,
-          etc. Raw Classic detection names.
-        - `orders-demo-named` (service.name set): `dt.service.name` =
-          `orders-api (orders-demo - OrderController)`,
-          `orders-api (orders-demo - InventoryController)`, etc. Prefix
-          applied.
-
-        The prefix is the fix in action. Classic detection still
-        fragments the workload; the fix makes the fragments legible as
-        belonging to `orders-api`.
+        Read:
+        - `orders-demo`: raw `dt.service.name` (e.g. `orders-demo - OrderController`).
+        - `orders-demo-named`: prefixed (`orders-api (orders-demo - OrderController)`).
 
     - id: 00000000-0000-0000-2303-00000000000b
       type: markdown
       markdown: |-
         ## Question 4: Does fragmentation go away?
-
-        Short answer: no. Fragmentation is a detection-model property,
-        not a naming property. This query confirms both workloads still
-        produce the classic 4-entity breakdown under SDv1.
 
     - id: 00000000-0000-0000-2303-00000000000c
       type: dql
@@ -160,40 +114,11 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: barChart
 
     - id: 00000000-0000-0000-2303-00000000000d
       type: markdown
       markdown: |-
-        **Read the result:**
-
-        Both rows typically show 4 distinct entities. Setting
-        `service.name` helps you *name* and *query* Classic services,
-        but it does not collapse the fragmentation.
-
-        For one-entity-per-workload, you need SDv2 detection on the
-        namespace. That's what Unit 1 covered.
-
-    - id: 00000000-0000-0000-2303-00000000000e
-      type: markdown
-      markdown: |-
-        ## What you just learned
-
-        Setting `service.name` on a Classic workload, today, gets you:
-
-        - `service.name` as a metric dimension (immediate query ergonomics)
-        - Prefixed `dt.service.name` (better readability in dashboards
-          and alerts)
-        - `service.name` on traces
-
-        It does NOT:
-
-        - Collapse entity fragmentation (that's SDv2's job)
-        - Change the Services app entity display name (UI update in flight)
-
-        Tell customers: if you're blocked on SDv2 rollout, set
-        `service.name` on your Classic workloads now. The query
-        ergonomics pay off immediately.
-
-        **Next:** [Module 2.4 - What's coming: pipeline-side name
-        control](#).
+        Read:
+        - Both workloads still show 4 distinct entities.
+        - `service.name` fixes naming and queryability; not fragmentation. For one-entity-per-workload, use SDv2 on the namespace.

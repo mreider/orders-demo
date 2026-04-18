@@ -4,40 +4,10 @@ theme: uncover
 class: invert
 paginate: true
 style: |
-  section {
-    background: linear-gradient(180deg, #0a0a14 0%, #0d0d1a 100%);
-    font-family: 'Segoe UI', 'Arial', sans-serif;
-    padding: 50px 70px 40px 70px;
-    color: #ffffff;
-    text-align: left;
-    overflow: hidden;
-  }
-  section.title {
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-  }
-  section.title h1 {
-    text-align: center;
-    border-bottom: 4px solid;
-    border-image: linear-gradient(90deg, #00a1e0, #b455b6) 1;
-    padding-bottom: 16px;
-    margin-bottom: 0;
-    font-size: 1.8em;
-  }
-  h1 {
-    color: #ffffff;
-    font-size: 1.6em;
-    font-weight: 700;
-    text-align: left;
-    border-bottom: 3px solid;
-    border-image: linear-gradient(90deg, #00a1e0, #b455b6) 1;
-    padding-bottom: 10px;
-    margin-bottom: 20px;
-    margin-top: 0;
-  }
+  section { background: linear-gradient(180deg, #0a0a14 0%, #0d0d1a 100%); font-family: 'Segoe UI', 'Arial', sans-serif; padding: 50px 70px 40px 70px; color: #ffffff; text-align: left; overflow: hidden; }
+  section.title { text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+  section.title h1 { text-align: center; border-bottom: 4px solid; border-image: linear-gradient(90deg, #00a1e0, #b455b6) 1; padding-bottom: 16px; margin-bottom: 0; font-size: 1.8em; }
+  h1 { color: #ffffff; font-size: 1.6em; font-weight: 700; text-align: left; border-bottom: 3px solid; border-image: linear-gradient(90deg, #00a1e0, #b455b6) 1; padding-bottom: 10px; margin-bottom: 20px; margin-top: 0; }
   p { font-size: 0.78em; line-height: 1.5; margin: 10px 0; }
   ul, ol { font-size: 0.78em; line-height: 1.5; margin: 8px 0; padding-left: 24px; }
   li { margin-bottom: 6px; }
@@ -48,129 +18,103 @@ style: |
   th { background: rgba(0,161,224,0.25); padding: 6px 10px; text-align: left; border-bottom: 2px solid #00a1e0; }
   td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.15); }
   img { max-width: 90%; max-height: 280px; border-radius: 6px; }
-  .avail { font-size: 0.7em; margin-top: 16px; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 4px; }
 ---
 
 <!-- _class: title -->
 
-# Module 2.3 — The `service.name` Workaround
+# Module 2.3 — The service.name workaround
 
-**Unit 2: Fix Classic services today**
-
----
-
-# The Question
-
-You have a Classic-detected service. Its name is `:8080`, or `OrderController`, or a Java class path.
-
-You can't query it cleanly by name — there's no `service.name` dimension on its metrics. And the Classic naming-rules overlay is deprecated.
-
-> *What can you do this month, without a Dynatrace release, to make it queryable and readable?*
+**Fix Classic-detected services today**
 
 ---
 
-# The Claim
+# The question
 
-Set `service.name` as a resource attribute on that workload's spans.
+You have a Classic-detected service named `:8080`, `OrderController`, or a Java class path.
 
-**Three immediate wins, one deferred.**
+- You can't query it cleanly by name
+- The old naming-rules overlay is deprecated
+
+> *What can you do this month to make it queryable and readable?*
 
 ---
 
-# What You Get Today
+# The claim
 
-| Benefit | How |
+**Set `service.name` as a resource attribute on spans.**
+
+Three immediate wins today, one pending:
+
+| Benefit | Today? |
 |---|---|
-| `service.name` as a queryable metric dimension | Standard metric extraction propagates resource attributes |
-| Prefixed `dt.service.name` on metrics — `<service.name> (<detected>)` | 2026-Q1 detection-layer fix |
-| Visible `service.name` on traces and span analysis | Span resource attribute carries through |
-
-The Services app entity display name catching up to the prefixed value is the **deferred** win — it ships with the next UI update.
-
----
-
-# What It Doesn't Fix
-
-Classic's **entity fragmentation** (multiple entities per workload) does **not** go away.
-
-- Setting `service.name` helps you **query** and **identify** Classic services
-- It does **not** collapse them into a single entity
-- For consolidation, you need Latest detection enabled on the namespace
-
-The workaround is about naming and queryability — not topology.
+| `service.name` as a queryable metric dimension | Yes |
+| Prefixed `dt.service.name` | Yes (2026-Q1 fix) |
+| `service.name` on traces | Yes |
+| Clean entity display name in Services app | Pending UI update |
 
 ---
 
-# How to Set It
+# What it does NOT do
 
-Mechanism depends on instrumentation:
+Classic's entity fragmentation **does not** go away.
 
-- **OTel-native**: `OTEL_SERVICE_NAME=<name>` env var
-- **OTel Java agent**: same env var on the agent's container
-- **OneAgent deep monitoring**: same env vars; OneAgent's OTel bridge surfaces them as resource attrs
-- **Code-level (any language)**: set the OTel SDK Resource directly — overrides env vars
+- You still get 4 entities per Spring Boot workload under SDv1
+- The workaround fixes *naming* and *queryability*
+- It does **not** collapse entities
 
----
-
-# Why This Matters
-
-A huge chunk of Latest's value is in **query ergonomics** (Module 2.2) and **naming** (Module 2.1).
-
-`service.name` delivers most of that benefit for your **Classic-detected services today**, without waiting for Latest to roll out to every namespace.
-
-It's the most useful thing to teach customers blocked on Latest for compatibility reasons. They get metric-first ergonomics this afternoon.
+For one-entity-per-workload, you need **Latest (SDv2)** on the namespace.
 
 ---
 
-# What the Lab Does
+# How to set service.name
 
-Open the companion notebook in your tenant: **Curriculum / Module 2.3**.
-
-Compares two Classic workloads in the demo's `orders-sdv1` namespace:
-
-- `orders-demo` — no `OTEL_SERVICE_NAME`, baseline behavior
-- `orders-demo-named` — `OTEL_SERVICE_NAME=orders-api` set
-
-Four queries demonstrate spans, metric dimensions, prefixed `dt.service.name`, and that entity counts stay the same.
+- **OTel-native / OTel Java agent**: `OTEL_SERVICE_NAME=<name>`
+- **Resource attributes**: `OTEL_RESOURCE_ATTRIBUTES=service.name=<name>`
+- **OneAgent**: respects OTel env vars on container-injected auto-instrumentation
+- **Code-level**: configure the OTel SDK Resource — overrides env vars
 
 ---
 
-# What You Should See
+# The lab
 
-For the **named** workload:
+Two Classic workloads identical except one env var:
 
-- `service.name` is on the spans
-- `service.name` is a queryable metric dimension
-- `dt.service.name` is **prefixed**: `orders-api (orders-demo - OrderController)`
-- Entity count is **unchanged** — still 4 Classic entities
+- `orders-demo` — no `OTEL_SERVICE_NAME`
+- `orders-demo-named` — `OTEL_SERVICE_NAME=orders-api`
 
-For the **baseline** workload: `service.name` is empty everywhere.
+Four queries demonstrate:
 
----
-
-# The Customer Recommendation
-
-When asked *"my Classic services have ugly names, what do I do?"*:
-
-1. Decide the right `service.name` per workload (workload, team, or business name — not a port)
-2. Set `OTEL_SERVICE_NAME` on the container
-3. Re-deploy. Within minutes, spans, metrics, and `dt.service.name` reflect it
-4. Write DQL using the new dimension (Module 2.2 patterns)
-5. Wait for the Services app UI to start displaying the prefixed name
+- `service.name` on spans (present on named, empty on baseline)
+- `service.name` as metric dimension (queryable on named only)
+- `dt.service.name` prefixed on named, raw on baseline
+- Entity counts — still 4 on both
 
 ---
 
-<!-- _class: screenshot -->
+# The prefix in action
 
-# What to Look For in the UI
+- Baseline: `dt.service.name = orders-demo - OrderController`
+- Named: `dt.service.name = orders-api (orders-demo - OrderController)`
 
-![placeholder](assets/placeholder-prefixed-service-name.png)
+The prefix makes fragments legible as belonging to one logical service. Classic detection still fragments; the fix makes it query-friendly.
 
-**SCREENSHOT:** Services app — list view filtered to the two demo workloads
-- Show `orders-demo` (baseline) and `orders-demo-named` side by side
-- Highlight the prefixed name on the named workload: `orders-api (orders-demo - OrderController)`
-- Open a Notebook cell, split by `service.name` — show value populated for named, empty for baseline
-- **Key point:** Same Classic detection, but the named workload has clean query ergonomics today
+---
+
+# Customer recommendation
+
+1. Pick `service.name` per workload (business name, not ports/paths)
+2. Set as `OTEL_SERVICE_NAME` on the container
+3. Re-deploy. Dimension appears within minutes.
+4. Write DQL against the new dimension (Module 2.2 patterns)
+5. Wait for the UI to read the prefixed name — the last remaining gap
+
+---
+
+# In the Dynatrace UI
+
+- Named workload shows prefixed name in service list once UI ships
+- Split a dashboard tile by `service.name` — named workload has a value, unnamed one is empty
+- That's the query-ergonomics difference, made visible
 
 ---
 
@@ -178,6 +122,4 @@ When asked *"my Classic services have ugly names, what do I do?"*:
 
 # Next: Module 2.4
 
-**What's coming — pipeline-side name control**
-
-The workaround needs a redeploy. The longer-term fix moves naming into the server-side pipeline, no app changes needed.
+**What's coming: pipeline-side naming.**

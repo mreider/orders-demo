@@ -10,23 +10,12 @@ content:
       markdown: |-
         # Module 1.4 - Classic vs Latest, side by side
 
-        *Unit 1: What is a service, really? - Module 4 of 4 (Unit payoff).*
-
-        Uses the companion `orders-demo` application deployed into two
-        namespaces: `orders-sdv1` (Classic detection) and `orders-sdv2`
-        (Latest detection). Every query runs twice - once per namespace -
-        so the diff is visible at a glance.
-
-        If you're running this against your own tenant and you have both
-        detection modes somewhere, substitute your namespaces.
+        Uses `orders-demo` deployed into `orders-sdv1` (Classic) + `orders-sdv2` (Latest). Every query runs both sides.
 
     - id: 00000000-0000-0000-1104-000000000002
       type: markdown
       markdown: |-
         ## Question 1: Entity count per workload
-
-        How many SERVICE entities does each detection model produce for
-        the same workload?
 
     - id: 00000000-0000-0000-1104-000000000003
       type: dql
@@ -42,27 +31,20 @@ content:
           timeframe:
             from: now()-30m
             to: now()
-        visualization: table
+        visualization: barChart
 
     - id: 00000000-0000-0000-1104-000000000004
       type: markdown
       markdown: |-
-        **Read the result:**
-
-        - `orders-sdv1` typically shows 4-5 distinct entities (WEB_REQUEST
-          aggregate + per-controller WEB_SERVICE + MESSAGING_SERVICE +
-          sometimes a DATABASE_SERVICE).
-        - `orders-sdv2` typically shows 1 (the UNIFIED entity).
-
-        Same pods. Same image. Same traffic. Different number of entities.
+        Read:
+        - `orders-sdv1` → 4-5 entities.
+        - `orders-sdv2` → 1 entity.
+        - Same pods, same traffic, different modelling.
 
     - id: 00000000-0000-0000-1104-000000000005
       type: markdown
       markdown: |-
         ## Question 2: Which entities are those, and what are they?
-
-        Enumerate them by name and type. The Classic side is the
-        revealing one.
 
     - id: 00000000-0000-0000-1104-000000000006
       type: dql
@@ -84,32 +66,17 @@ content:
     - id: 00000000-0000-0000-1104-000000000007
       type: markdown
       markdown: |-
-        **Read the result:**
-
-        - `WEB_REQUEST_SERVICE` - workload-level aggregate (classic
-          K8s-aware rollup).
-        - `WEB_SERVICE` - per-controller fragments. Each controller class
-          becomes its own entity.
-        - `MESSAGING_SERVICE` - the Kafka consumer as an entity.
-        - `DATABASE_SERVICE` - if present, the JDBC client's synthesised
-          entity. **There is no Postgres service being monitored here** -
-          this is the Spring app's client-side JDBC calls dressed up as
-          a service entity. The "fake entity" problem.
-        - `UNIFIED` - the Latest model's single row per workload.
-
-        Look for the DATABASE_SERVICE named after your database (e.g.
-        `orders` or `postgres`). That's the most honest illustration of
-        what the Latest model cleans up: a thing that was never really
-        a service to begin with.
+        Read:
+        - `WEB_REQUEST_SERVICE` → Classic workload aggregate.
+        - `WEB_SERVICE` → per-controller fragments.
+        - `MESSAGING_SERVICE` → Kafka consumer.
+        - `DATABASE_SERVICE` → JDBC client dressed as a service (fake entity).
+        - `UNIFIED` → Latest's single row per workload.
 
     - id: 00000000-0000-0000-1104-000000000008
       type: markdown
       markdown: |-
         ## Question 3: Activity totals are the same
-
-        If the same pods are handling the same traffic, total request
-        counts should match between the two namespaces. This query proves
-        the spans themselves are identical; only the modelling differs.
 
     - id: 00000000-0000-0000-1104-000000000009
       type: dql
@@ -129,19 +96,13 @@ content:
     - id: 00000000-0000-0000-1104-00000000000a
       type: markdown
       markdown: |-
-        **Read the result:**
-
-        Two lines, approximately the same throughput. Whatever slicing
-        the detection models do happens *on top of* the same span stream -
-        it does not change the underlying activity.
+        Read:
+        - Two lines track each other. Underlying spans are identical.
 
     - id: 00000000-0000-0000-1104-00000000000b
       type: markdown
       markdown: |-
         ## Question 4: Query shape diverges
-
-        Ask the same workload-level question on each side. Note the DQL
-        shape of each answer.
 
         ### Classic side (orders-sdv1)
 
@@ -185,40 +146,7 @@ content:
     - id: 00000000-0000-0000-1104-00000000000f
       type: markdown
       markdown: |-
-        **Read the result:**
-
-        Same total throughput, dramatically different queries.
-
-        - Classic: group-by entity + lookup against entity table + filter
-          by serviceType + filter by entity name.
-        - Latest: filter by dt.service.name. Done.
-
-        In the query metadata pane you'll often see Classic scans
-        more records than Latest for this exact question. The entity
-        lookup is the extra cost.
-
-    - id: 00000000-0000-0000-1104-000000000010
-      type: markdown
-      markdown: |-
-        ## What you just learned (Unit 1 close)
-
-        1. The same application produces different entity graphs under
-           Classic vs Latest - and some Classic entities (DATABASE_SERVICE,
-           sometimes per-controller WEB_SERVICE) are synthesised rather
-           than real.
-        2. The spans are the same. The modelling on top is what differs.
-        3. Latest DQL is shorter and cheaper because identity lives on
-           metric dimensions, not in a separate entity graph you have to
-           join.
-        4. Classic's richness (multiple entities per workload) wasn't
-           giving you more information - it was organising the same
-           information differently, with more ceremony.
-
-        **Unit 1 ends here.** You know what a service is in Latest
-        Dynatrace and how it differs from Classic.
-
-        Unit 2 tackles naming: where service names come from, why queries
-        get easier when names propagate as metric dimensions, and how to
-        fix Classic services that still show up with ugly detected names.
-
-        **Next:** [Unit 2, Module 2.1 - Where names come from](#).
+        Read:
+        - Classic: group-by entity + lookup + filter serviceType + filter name.
+        - Latest: one filter on `dt.service.name`.
+        - Check query metadata: Classic scans more records.

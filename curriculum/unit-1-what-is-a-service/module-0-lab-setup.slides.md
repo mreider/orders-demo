@@ -48,92 +48,53 @@ style: |
   th { background: rgba(0,161,224,0.25); padding: 6px 10px; text-align: left; border-bottom: 2px solid #00a1e0; }
   td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.15); }
   img { max-width: 90%; max-height: 280px; border-radius: 6px; }
-  .avail { font-size: 0.7em; margin-top: 16px; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 4px; }
 ---
 
 <!-- _class: title -->
 
-# Module 0 — Lab Setup
+# Module 0 — Lab setup
 
-**Get your tenant ready to run the curriculum**
-
----
-
-# What This Module Does
-
-Every lab in this curriculum runs against **your own Dynatrace tenant**, not a shared sandbox.
-
-By the end of this module, your environment is ready and you've verified it by loading and running one notebook end-to-end.
+**Get your tenant ready to run every lab in 3 minutes**
 
 ---
 
-# What You Need
+# Prereqs
 
-- A **Dynatrace SaaS tenant** you can log into
-- A **Kubernetes workload** under monitoring (or use the `orders-demo` companion app)
-- **`dtctl`** installed locally — `brew install dynatrace-oss/tap/dtctl`
-- A **platform access token** with document read/write/share scopes
-
----
-
-# Required Token Scopes
-
-If your token has a `readwrite-all` profile, you're covered. Otherwise:
-
-- `document:documents:read`
-- `document:documents:write`
-- `document:environment-shares:read`
-- `document:environment-shares:write`
-
-These let `dtctl` create, update, and share lab notebooks across your tenant.
+- Dynatrace SaaS tenant you can log into
+- A Kubernetes workload under monitoring (or `orders-demo` deployed to any cluster)
+- **`dtctl`** installed: `brew install dynatrace-oss/tap/dtctl`
+- Platform token with **four scopes**:
+  - `document:documents:read`
+  - `document:documents:write`
+  - `document:environment-shares:read`
+  - `document:environment-shares:write`
 
 ---
 
-# First-Time Login
+# Load the Labs
 
-One-time authentication — opens a browser for SSO, then caches the token in your OS keychain:
+One-time auth, then apply every notebook in the tree:
 
 ```bash
 dtctl auth login
-```
 
-Re-run this if you ever see `access denied to document` — it usually means a scope was added after your last login.
-
----
-
-# Load the Lab Notebooks
-
-Clone the curriculum repo, then from the repo root:
-
-```bash
 for f in curriculum/**/*.yaml; do
   dtctl apply -f "$f" --write-id --share-environment
 done
 ```
 
-- **`--write-id`** stamps the new notebook ID into the YAML so future applies update in place
-- **`--share-environment`** makes each notebook visible to everyone in your tenant — no manual UI sharing needed
+- `--write-id` stamps the notebook ID back so future applies update in place
+- `--share-environment` makes the notebook visible tenant-wide
 
 ---
 
 # Sanity Check
 
-Open the **Notebooks** app in your tenant, filter by name `Curriculum /`, and run the **Module 1.1** notebook.
+1. Open the **Notebooks** app in your tenant
+2. Filter by name `Curriculum /`
+3. Open **Module 1.1** and run its first query
 
-If you see a table of DQL results, your setup works.
-
-If not — re-run `dtctl auth login`, check your token scopes, confirm `dtctl` is on your PATH.
-
----
-
-# A Note on Terminology
-
-This curriculum uses customer-facing terms:
-
-- **Latest Dynatrace** — the new detection model
-- **Classic Dynatrace** — the legacy model
-
-Some DQL queries use the internal identifiers `SDv2`, `UNIFIED`, `WEB_REQUEST_SERVICE`, `WEB_SERVICE` because the data layer requires them. That's the only place you'll see internal labels.
+If results come back, you're ready for Unit 1.
 
 ---
 
@@ -141,6 +102,4 @@ Some DQL queries use the internal identifiers `SDv2`, `UNIFIED`, `WEB_REQUEST_SE
 
 # Next: Module 1.1
 
-**One workload, one service**
-
-The first concept the rest of the curriculum builds on.
+**One workload, one service.**

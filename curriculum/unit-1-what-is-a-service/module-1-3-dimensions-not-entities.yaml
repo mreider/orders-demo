@@ -10,23 +10,12 @@ content:
       markdown: |-
         # Module 1.3 - Dimensions, not entities, split the view
 
-        *Unit 1: What is a service, really? - Module 3 of 4.*
-
-        Three queries answer the same question - "which endpoint is hottest?" -
-        three ways. You'll need two workloads for this lab: one under Classic
-        SDv1 detection, one under Latest SDv2. The companion demo supplies both:
-        - SDv1 side: namespace `orders-sdv1`, workload `orders-demo`
-        - SDv2 side: namespace `orders-sdv2`, workload `orders-demo`
-
-        If your own tenant has both, substitute your own values.
+        You need two workloads: one Classic SDv1 and one Latest SDv2. Demo has both: `orders-sdv1 / orders-demo` (Classic) and `orders-sdv2 / orders-demo` (Latest).
 
     - id: 00000000-0000-0000-1103-000000000002
       type: markdown
       markdown: |-
         ## Question 1: Classic style - one entity per endpoint-group
-
-        Under Classic detection, each controller class becomes its own
-        WEB_SERVICE entity. This query groups at the entity level.
 
     - id: 00000000-0000-0000-1103-000000000003
       type: dql
@@ -51,25 +40,14 @@ content:
     - id: 00000000-0000-0000-1103-000000000004
       type: markdown
       markdown: |-
-        **Read the result:**
-
-        Under Classic, each row is a *different entity*. To get named rows
-        you lookup against the entity table. If your tenant is fully on
-        Latest and doesn't have WEB_SERVICE entities, this query will be
-        empty - that's fine, skip to Question 2.
-
-        **If this query feels awkward:** that's the point. Entity-first
-        slicing forces you to route through the entity graph even for
-        questions that are fundamentally about dimensions.
+        Read:
+        - Each row = a separate entity, resolved via `lookup`.
+        - Empty result → your tenant has no WEB_SERVICE entities; skip to Q2.
 
     - id: 00000000-0000-0000-1103-000000000005
       type: markdown
       markdown: |-
         ## Question 2: Latest style - one entity, group by endpoint.name
-
-        Same question, Latest model. Instead of grouping by entity, you
-        group by the endpoint.name dimension on metrics from the single
-        UNIFIED service.
 
     - id: 00000000-0000-0000-1103-000000000006
       type: dql
@@ -90,24 +68,14 @@ content:
     - id: 00000000-0000-0000-1103-000000000007
       type: markdown
       markdown: |-
-        **Read the result:**
-
-        One filter, one group-by, one line per endpoint. No entity
-        lookup, no service-type filtering, no extra pipeline steps.
-
-        If you're using the demo, `<YOUR_SDV2_SERVICE_NAME>` is
-        `orders-sdv2 -- orders-demo`. In your own tenant, it's whatever
-        the Services app shows as the service name for your UNIFIED
-        entity.
+        Read:
+        - One filter, one group-by, no entity lookup.
+        - Demo: `<YOUR_SDV2_SERVICE_NAME>` = `orders-sdv2 -- orders-demo`.
 
     - id: 00000000-0000-0000-1103-000000000008
       type: markdown
       markdown: |-
         ## Question 3: Same mechanism, different family
-
-        The attribute-first pattern generalises. Swap `dt.service.request.*`
-        for `dt.service.messaging.process.*` and `endpoint.name` for
-        `messaging.destination.name` - the shape is identical.
 
     - id: 00000000-0000-0000-1103-000000000009
       type: dql
@@ -128,24 +96,5 @@ content:
     - id: 00000000-0000-0000-1103-00000000000a
       type: markdown
       markdown: |-
-        **Read the result:**
-
-        Same service entity. Different metric family. Different dimension.
-        Same DQL shape. The mechanism is uniform.
-
-    - id: 00000000-0000-0000-1103-00000000000b
-      type: markdown
-      markdown: |-
-        ## What you just learned
-
-        1. "Per-controller" / "per-destination" used to mean "per-entity"
-           in Classic. In Latest, it means "per-dimension-value."
-        2. The DQL shape for dimension splits is the same regardless of
-           transport family - swap the metric, swap the dimension.
-        3. There is no entity-graph round-trip in Latest. The slice is
-           in the query.
-
-        Unit 1 closes with Module 1.4, where you see the two models
-        side by side on identical application code.
-
-        **Next:** [Module 1.4 - Classic vs Latest, side by side](#).
+        Read:
+        - Same service entity, different family, same DQL shape.

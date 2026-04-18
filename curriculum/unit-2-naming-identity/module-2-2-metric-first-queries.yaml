@@ -10,23 +10,12 @@ content:
       markdown: |-
         # Module 2.2 - Metric-first queries
 
-        *Unit 2: Naming and identity - Module 2 of 4.*
-
-        Each pair below answers the same question two ways. Run both.
-        Open the query metadata panel (bottom of each cell) and compare
-        `Scanned records` - that's the cost difference.
-
-        Replace `<YOUR_SERVICE_NAME>` with the dt.service.name value
-        for a service in your tenant (you can find one by running
-        `timeseries by: {dt.service.name}, filter: ..., from: now()-5m`
-        against any workload).
+        Replace `<YOUR_SERVICE_NAME>` with a `dt.service.name` in your tenant. Open the query-metadata panel under each cell and compare Scanned records.
 
     - id: 00000000-0000-0000-2202-000000000002
       type: markdown
       markdown: |-
-        ## Comparison 1: List endpoints of a service
-
-        ### Entity-joined (longer)
+        ## Comparison 1: List endpoints of a service — entity-joined
 
     - id: 00000000-0000-0000-2202-000000000003
       type: dql
@@ -49,7 +38,7 @@ content:
     - id: 00000000-0000-0000-2202-000000000004
       type: markdown
       markdown: |-
-        ### Metric-first (shorter)
+        ## Comparison 1: Metric-first
 
     - id: 00000000-0000-0000-2202-000000000005
       type: dql
@@ -69,19 +58,14 @@ content:
     - id: 00000000-0000-0000-2202-000000000006
       type: markdown
       markdown: |-
-        **Read the result:**
-
-        Same rows, same counts. The metric-first version has no `lookup`,
-        no `svc.*` fields, one filter instead of two. Check the query
-        metadata at the bottom of each cell - Scanned records on the
-        metric-first version is typically lower.
+        Read:
+        - Same rows, same counts. Metric-first: one filter, no `lookup`.
+        - Scanned records in metric-first is typically lower.
 
     - id: 00000000-0000-0000-2202-000000000007
       type: markdown
       markdown: |-
-        ## Comparison 2: Average response time for one endpoint
-
-        ### Entity-joined
+        ## Comparison 2: Response time for one endpoint — entity-joined
 
     - id: 00000000-0000-0000-2202-000000000008
       type: dql
@@ -104,7 +88,7 @@ content:
     - id: 00000000-0000-0000-2202-000000000009
       type: markdown
       markdown: |-
-        ### Metric-first
+        ## Comparison 2: Metric-first
 
     - id: 00000000-0000-0000-2202-00000000000a
       type: dql
@@ -123,9 +107,7 @@ content:
     - id: 00000000-0000-0000-2202-00000000000b
       type: markdown
       markdown: |-
-        ## Comparison 3: Failure rate split by HTTP status
-
-        ### Entity-joined
+        ## Comparison 3: Failure rate by HTTP status — entity-joined
 
     - id: 00000000-0000-0000-2202-00000000000c
       type: dql
@@ -147,7 +129,7 @@ content:
     - id: 00000000-0000-0000-2202-00000000000d
       type: markdown
       markdown: |-
-        ### Metric-first
+        ## Comparison 3: Metric-first
 
     - id: 00000000-0000-0000-2202-00000000000e
       type: dql
@@ -166,9 +148,7 @@ content:
     - id: 00000000-0000-0000-2202-00000000000f
       type: markdown
       markdown: |-
-        ## Comparison 4: Workload total across three families
-
-        ### Entity-joined
+        ## Comparison 4: Workload total across three families — entity-joined
 
     - id: 00000000-0000-0000-2202-000000000010
       type: dql
@@ -193,7 +173,7 @@ content:
     - id: 00000000-0000-0000-2202-000000000011
       type: markdown
       markdown: |-
-        ### Metric-first
+        ## Comparison 4: Metric-first
 
     - id: 00000000-0000-0000-2202-000000000012
       type: dql
@@ -213,12 +193,6 @@ content:
     - id: 00000000-0000-0000-2202-000000000013
       type: markdown
       markdown: |-
-        ## What you just learned
-
-        1. `dt.service.name` and `service.name` are queryable metric
-           dimensions, not just entity display names.
-        2. Metric-first DQL is shorter, cheaper, and easier to read.
-        3. The entity table is for *entity metadata* (ownership, tags,
-           description). Prefer metric dimensions for most questions.
-
-        **Next:** [Module 2.3 - The service.name workaround](#).
+        Read:
+        - Every metric-first version is shorter and scans fewer records.
+        - Reserve entity-joined for when you actually need entity metadata (ownership, tags).

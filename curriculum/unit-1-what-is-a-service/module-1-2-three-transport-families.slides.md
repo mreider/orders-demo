@@ -4,40 +4,10 @@ theme: uncover
 class: invert
 paginate: true
 style: |
-  section {
-    background: linear-gradient(180deg, #0a0a14 0%, #0d0d1a 100%);
-    font-family: 'Segoe UI', 'Arial', sans-serif;
-    padding: 50px 70px 40px 70px;
-    color: #ffffff;
-    text-align: left;
-    overflow: hidden;
-  }
-  section.title {
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-  }
-  section.title h1 {
-    text-align: center;
-    border-bottom: 4px solid;
-    border-image: linear-gradient(90deg, #00a1e0, #b455b6) 1;
-    padding-bottom: 16px;
-    margin-bottom: 0;
-    font-size: 1.8em;
-  }
-  h1 {
-    color: #ffffff;
-    font-size: 1.6em;
-    font-weight: 700;
-    text-align: left;
-    border-bottom: 3px solid;
-    border-image: linear-gradient(90deg, #00a1e0, #b455b6) 1;
-    padding-bottom: 10px;
-    margin-bottom: 20px;
-    margin-top: 0;
-  }
+  section { background: linear-gradient(180deg, #0a0a14 0%, #0d0d1a 100%); font-family: 'Segoe UI', 'Arial', sans-serif; padding: 50px 70px 40px 70px; color: #ffffff; text-align: left; overflow: hidden; }
+  section.title { text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+  section.title h1 { text-align: center; border-bottom: 4px solid; border-image: linear-gradient(90deg, #00a1e0, #b455b6) 1; padding-bottom: 16px; margin-bottom: 0; font-size: 1.8em; }
+  h1 { color: #ffffff; font-size: 1.6em; font-weight: 700; text-align: left; border-bottom: 3px solid; border-image: linear-gradient(90deg, #00a1e0, #b455b6) 1; padding-bottom: 10px; margin-bottom: 20px; margin-top: 0; }
   p { font-size: 0.78em; line-height: 1.5; margin: 10px 0; }
   ul, ol { font-size: 0.78em; line-height: 1.5; margin: 8px 0; padding-left: 24px; }
   li { margin-bottom: 6px; }
@@ -48,110 +18,74 @@ style: |
   th { background: rgba(0,161,224,0.25); padding: 6px 10px; text-align: left; border-bottom: 2px solid #00a1e0; }
   td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.15); }
   img { max-width: 90%; max-height: 280px; border-radius: 6px; }
-  .avail { font-size: 0.7em; margin-top: 16px; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 4px; }
 ---
 
 <!-- _class: title -->
 
-# Module 1.2 — The Three Transport Families
+# Module 1.2 — The three transport families
 
-**Unit 1: What is a service?**
-
----
-
-# The Question
-
-Pick the service you worked with in Module 1.1.
-
-> *What kind of activity does this service do?*
-
-You probably said *"it handles HTTP requests."* Often true — but the same service might also consume Kafka, process Lambda invocations, or do all three.
-
-Each kind of activity lives under a **different metric family**.
+**Every service's activity lives in one of three metric families**
 
 ---
 
-# The Claim
+# The question
 
-Every service's activity in Dynatrace is measured under exactly one of three metric families.
+Pick the service from Module 1.1.
+
+> *What kind of activity does it do, and in which metric family is it counted?*
+
+---
+
+# The three families
 
 | Family | Counts |
 |---|---|
-| `dt.service.request.*` | HTTP, gRPC, RMI entry points |
-| `dt.service.messaging.process.*` | Kafka, SQS, Pub/Sub message consumption |
+| `dt.service.request.*` | HTTP/gRPC/RMI entry points |
+| `dt.service.messaging.process.*` | Message consumption (Kafka, SQS, Pub/Sub) |
 | `dt.service.faas_invoke.*` | Serverless function invocations |
 
-There is no fourth family. Database calls and outbound HTTP attach to the **caller**, not their own family.
+A service that handles both HTTP and Kafka has activity in two families.
 
 ---
 
-# Each Family Has Native Dimensions
+# Key dimensions per family
 
-The dimensions are the levers you split the chart by:
-
-| Family | Key dimensions |
-|---|---|
-| `request.*` | `endpoint.name`, `http.route`, `http.response.status_code` |
-| `messaging.process.*` | `messaging.destination.name`, `messaging.system`, `messaging.operation` |
-| `faas_invoke.*` | `faas.trigger` |
-
-Module 1.3 covers the dimensions in detail.
+- **Requests**: `endpoint.name`, `http.route`, `http.response.status_code`
+- **Messaging**: `messaging.destination.name`, `messaging.system`, `messaging.operation`
+- **FaaS**: `faas.trigger`
 
 ---
 
-# Why "Transactions" Now Means Three Things
+# The Transactions column
 
-The Services app calls the umbrella of all three **"Transactions"**.
+The Services app's **Transactions** column is the **coalesced sum** across all three families.
 
-It used to say *"Requests,"* which made people think HTTP-only. The rename matters because:
-
-- A REST + Kafka service has transactions of **two kinds**
-- The Transactions column is the **coalesced total**
-- Old dashboards that filtered to `request.*` only show part of the picture
+Database client calls and outbound HTTP do **not** get their own family — they attach to the caller and surface via Downstream tabs (Module 3.3).
 
 ---
 
-# Why This Matters
+# The lab
 
-- **Per-endpoint baselines, failure rates, and latency** all live on one of the three families
-- **Mixed-transport services** (REST + Kafka, Lambda + API Gateway) need coalesced views
-- The UI surfaces **Message Processing** and **Functions** tabs only when those families have data — that's why a pure HTTP service doesn't see them
-
----
-
-# What the Lab Does
-
-Open the companion notebook in your tenant: **Curriculum / Module 1.2**.
-
-Three queries on a workload you pick:
-
-1. **Which families does this service emit?** — counts side by side.
-2. **Same workload, split by endpoint dimension.** — zooms into the dimensions per family.
-3. **Coalesce.** — the workload-total query that matches the UI's "Transactions."
+- Sum the three families for one workload side by side
+- Split each by its native dimension
+- Coalesce to one-number Transactions view
 
 ---
 
-# What You Should See
+# What you should see
 
-- **Pure HTTP service**: only `request.*` has counts.
-- **REST + Kafka** (the demo's `orders-demo`): both `request.*` and `messaging.process.*`.
-- **Lambda**: `faas_invoke.*` populated; if behind API Gateway, `request.*` too.
-
-The "Transactions" number in the UI is the sum across all three.
+- Pure HTTP service: only `request.*` has counts
+- Kafka-consuming REST service: `request.*` + `messaging.process.*`
+- Lambda: `faas_invoke.*` (plus `request.*` if behind API Gateway)
 
 ---
 
-<!-- _class: screenshot -->
+# In the Dynatrace UI
 
-# What to Look For in the UI
-
-![placeholder](assets/placeholder-transactions-and-tabs.png)
-
-**SCREENSHOT:** Services app — service detail page Overview tab
-- Show the **Transactions** metric prominently on Overview
-- Show the **Message Processing** tab (and Functions tab if applicable) in the tab strip
-- Highlight the **split-by** control offering `endpoint.name`, `messaging.destination.name`, `faas.trigger`
-- **Key point:** One Transactions metric, three families behind it, one split-by control to slice them
+- Overview tab shows **Transactions** — coalesced total
+- **Message Processing** tab appears only when messaging data exists
+- **Functions** tab appears only when FaaS data exists
+- Split-by charts Transactions by `endpoint.name`, `messaging.destination.name`, or `faas.trigger`
 
 ---
 
@@ -159,6 +93,4 @@ The "Transactions" number in the UI is the sum across all three.
 
 # Next: Module 1.3
 
-**Dimensions, not entities, split the view**
-
-Now that you know what's being counted, see how Latest splits those counts without creating new entities.
+**Dimensions, not entities, split the view.**
