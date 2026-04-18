@@ -49,6 +49,19 @@ Messaging follows the same vision; broker-as-owner linking is less mature.
 
 ---
 
+# Source view vs. client view — already possible today
+
+You don't have to wait for SDv2-for-OneAgent's topology linking to **see** the source-vs-client split. Stand up a standard Prometheus exporter or use a OneAgent built-in sensor, and the "real entity" view exists alongside the client-span view right now.
+
+| Target | Source-view path today | Example metrics |
+|---|---|---|
+| **Postgres** | `postgres-exporter` + `com.dynatrace.extension.otel-postgres` Hub extension | `postgres.xact_commit`, `postgres.deadlocks`, `postgres.blks_hit` |
+| **Kafka** | OneAgent built-in Kafka sensor (auto-detects Apache Kafka JVM) | `kafka.consumer_group.lag`, `kafka.request.time.99p`, `kafka.purgatory.size` |
+
+What's coming in a future SDv2-for-OneAgent release: **the link**. The calling service's `dt.service.database.*` metric points at the real DB entity. Alerts anchor on the database instead of the caller. Two charts become one tab with the right owner.
+
+---
+
 # `endpoint.name` and the `GET /*` reality
 
 - `endpoint.name` derives from `http.route` on server spans
@@ -106,10 +119,12 @@ Same answer. Fewer lines, fewer scanned records, stable across entity re-detecti
 
 # See it live
 
-**Demo: SDv2 demo** (`sdv2-demo.yaml`) — Questions 5-10
+**Demo: SDv2 demo** (`sdv2-demo.yaml`) — Questions 5 through 9c
 
 - Three families side-by-side on the SDv2 workload
 - The legacy `request.*`/messaging double-count on `OrderEventsListener`
 - Split requests by `endpoint.name` — see the `GET /*` fallback
 - Messaging + DB as dimensions on the caller
+- **Q9b** — Postgres: client-side JDBC view vs. source-side `postgres.*` metrics from the extension
+- **Q9c** — Kafka: client-side `messaging.process.*` vs. source-side `kafka.*` metrics from OneAgent's built-in sensor
 - Metric-first vs entity-first — same question, two shapes
