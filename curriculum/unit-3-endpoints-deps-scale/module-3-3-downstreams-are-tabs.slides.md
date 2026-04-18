@@ -30,13 +30,13 @@ style: |
 
 # The question
 
-Your service calls Postgres. In Classic, Postgres showed up as a `DATABASE_SERVICE` entity:
+Your service calls Postgres. Under SDv1, Postgres showed up as a `DATABASE_SERVICE` entity:
 
 - Its own row in the Services list
 - Its own failure rate, baselines
 - "Is the DB slow?" = click into the DATABASE_SERVICE
 
-In Latest, that row often doesn't exist.
+Under SDv2, that row often doesn't exist.
 
 > *Where do DB calls live, and why did the model change?*
 
@@ -58,7 +58,7 @@ Data didn't disappear — it relocated.
 
 # No more fake entities
 
-In Classic, `postgres:orders-db` `DATABASE_SERVICE` existed not because Postgres was being monitored.
+Under SDv1, `postgres:orders-db` `DATABASE_SERVICE` existed not because Postgres was being monitored.
 
 - It existed because Dynatrace needed somewhere to attach client-side JDBC metrics
 - The entity was always a fiction

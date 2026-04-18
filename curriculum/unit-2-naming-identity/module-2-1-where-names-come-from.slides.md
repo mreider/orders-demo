@@ -43,12 +43,12 @@ The answer is a chain of span resource attributes.
 
 # The fallback chain
 
-Under Latest, service names come from span resource attributes **in this order**:
+Under SDv2, service names come from span resource attributes **in this order**:
 
 1. **`service.name`** (OpenTelemetry) — used directly if present
 2. **`k8s.workload.name`** — used if no `service.name`
 3. **Cloud-native fallbacks** — `faas.name` for Lambda, task family for ECS
-4. **Classic detection residue** — process-group fingerprinting (ports, paths, class names)
+4. **SDv1 detection residue** — process-group fingerprinting (ports, paths, class names)
 
 ---
 

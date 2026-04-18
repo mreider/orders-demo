@@ -40,7 +40,7 @@ In **Classic**, this answer lived in a *different service* (each controller = it
 
 # The shift
 
-- What split into separate entities in Classic becomes a **dimension value** in Latest
+- What split into separate entities under SDv1 becomes a **dimension value** with SDv2
 - Group or filter by dimension to get the slice
 - Nothing new is created in the entity graph
 

@@ -31,4 +31,4 @@ This maps directly onto Datadog's unified service tagging (`service` + `env` + `
 
 ## End
 
-You've covered: what a service is in Latest, how names propagate, the `service.name` workaround, per-endpoint baselining, the `http.route` gap, downstreams as tabs, and what's next.
+You've covered: what a service is with SDv2, how names propagate, the `service.name` workaround, per-endpoint baselining, the `http.route` gap, downstreams as tabs, and what's next.

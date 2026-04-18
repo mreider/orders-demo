@@ -4,9 +4,9 @@
 
 ## The question
 
-In Classic, you picked a handful of endpoints per service as **key requests** — those got individual baselines and alerts; everything else rolled up into `NON_KEY_REQUESTS`.
+Under SDv1, you picked a handful of endpoints per service as **key requests** — those got individual baselines and alerts; everything else rolled up into `NON_KEY_REQUESTS`.
 
-> *What happens in Latest when you don't configure key requests?*
+> *What happens with SDv2 when you don't configure key requests?*
 
 ## The claim
 

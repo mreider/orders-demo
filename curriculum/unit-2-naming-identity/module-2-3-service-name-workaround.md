@@ -1,10 +1,10 @@
 # Module 2.3 — The `service.name` workaround for Classic services
 
-*For any Classic-detected workload with an ugly name, explain what setting `service.name` on spans gets you today, what it doesn't, and when the remaining gaps close.*
+*For any SDv1-detected workload with an ugly name, explain what setting `service.name` on spans gets you today, what it doesn't, and when the remaining gaps close.*
 
 ## The question
 
-You have a Classic-detected service named `:8080`, `OrderController`, or a Java class path. You can't query it cleanly by name, and the old naming-rules overlay is deprecated.
+You have a SDv1-detected service named `:8080`, `OrderController`, or a Java class path. You can't query it cleanly by name, and the old naming-rules overlay is deprecated.
 
 > *What can you do this month, without waiting for a Dynatrace release, to make it queryable and readable?*
 

@@ -1,6 +1,6 @@
-# Services in Latest Dynatrace — a curriculum
+# Service Detection v1 → v2 — a curriculum
 
-A 90-minute self-paced course for Dynatrace customers on how services work under the Latest detection model and how it differs from Classic. Each module pairs a short concept narrative with a hands-on lab notebook that runs against your own tenant.
+A 90-minute self-paced course on the Service Detection v2 (SDv2) model and how it differs from Service Detection v1 (SDv1) for OneAgent-monitored workloads. SDv2 for OneAgent is only available on Latest Dynatrace tenants; the course assumes a Latest tenant. Each module pairs a short concept narrative with a hands-on lab notebook that runs against your own tenant.
 
 | Unit | Focus | Modules |
 |---|---|---|

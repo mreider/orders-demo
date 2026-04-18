@@ -4,9 +4,9 @@
 
 ## The question
 
-Your service calls Postgres. In Classic, Postgres showed up as a `DATABASE_SERVICE` entity with its own row, failure rate, and baselines. In Latest that row is gone.
+Your service calls Postgres. Under SDv1, Postgres showed up as a `DATABASE_SERVICE` entity with its own row, failure rate, and baselines. Under SDv2 that row is gone.
 
-> *Where do DB calls live in Latest, and why did the model change?*
+> *Where do DB calls live with SDv2, and why did the model change?*
 
 ## The claim
 

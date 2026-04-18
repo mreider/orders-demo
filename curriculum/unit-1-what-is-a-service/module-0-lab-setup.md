@@ -2,6 +2,17 @@
 
 *You'll have a tenant ready to run every lab and one notebook loaded as a sanity check.*
 
+## Two axes worth naming
+
+This course sits at the intersection of two things that sometimes get conflated:
+
+- **UI generation**: *Classic Dynatrace* vs *Latest Dynatrace*. This is the tenant-level app experience — the shape of the Services app, the Notebooks app, the Kubernetes app.
+- **Detection model**: *Service Detection v1 (SDv1)* vs *Service Detection v2 (SDv2)*. This is how Dynatrace turns spans into service entities.
+
+They're orthogonal in principle but coupled in practice: **SDv2 for OneAgent is available only on Latest Dynatrace**. (SDv2 for OTel-instrumented workloads works on either, but this course uses OneAgent.) So to see SDv2 on your own workload you need both: a Latest Dynatrace tenant *and* SDv2 opted in for the namespace.
+
+Where the course says "under SDv2" or "with SDv2", the claim is about the detection model. Where it says "in Latest Dynatrace" or "the Latest Services app", the claim is about the UI.
+
 ## Prereqs
 
 - Dynatrace SaaS tenant you can log into.

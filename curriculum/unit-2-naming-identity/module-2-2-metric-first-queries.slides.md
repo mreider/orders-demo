@@ -41,7 +41,7 @@ Two DQL shapes answer it. Both return the same numbers.
 
 # The claim
 
-`dt.service.name` and `service.name` are **first-class metric dimensions** in Latest.
+`dt.service.name` and `service.name` are **first-class metric dimensions** with SDv2.
 
 - `filter` and `by` them directly on the metric
 - No `fetch dt.entity.service` needed
@@ -107,7 +107,7 @@ Watch **Scanned records** and **Execution time** in the cell metadata panel. Che
 
 # Where it breaks
 
-**Classic-detected services** may not have `dt.service.name` populated consistently.
+**SDv1-detected services** may not have `dt.service.name` populated consistently.
 
 If your workload is Classic and you haven't set `service.name`, metric-first queries by name will miss it.
 

@@ -10,7 +10,7 @@ Two DQL shapes answer it. Both return the same numbers. One is five lines, one i
 
 ## The claim
 
-`dt.service.name` and `service.name` are first-class metric dimensions in Latest. You can `filter` and `by` them directly on the timeseries metric — no `fetch dt.entity.service` needed. The entity table is still there for entity metadata (ownership, tags), just not on the critical path for metric questions.
+`dt.service.name` and `service.name` are first-class metric dimensions with SDv2. You can `filter` and `by` them directly on the timeseries metric — no `fetch dt.entity.service` needed. The entity table is still there for entity metadata (ownership, tags), just not on the critical path for metric questions.
 
 Consequences:
 
@@ -41,7 +41,7 @@ Nothing changes in the Services app — it already runs the right queries intern
 
 ## Where it breaks
 
-Classic-detected services may not have `dt.service.name` populated consistently. Module 2.3 covers that.
+SDv1-detected services may not have `dt.service.name` populated consistently. Module 2.3 covers that.
 
 ## Next
 

@@ -10,12 +10,12 @@ Pick a well-named service (e.g. `payments`) and a badly-named one (e.g. `:8080`,
 
 ## The claim
 
-Under Latest, service names come from span resource attributes in this order, first-match-wins:
+Under SDv2, service names come from span resource attributes in this order, first-match-wins:
 
 1. **`service.name`** (OpenTelemetry). Used directly if present.
 2. **`k8s.workload.name`** (with namespace scoping). Used if no `service.name`.
 3. **Cloud-native fallbacks** — `faas.name` for Lambda, task family for ECS, etc.
-4. **Classic detection residue** — process-group fingerprinting (ports, paths, class names).
+4. **SDv1 detection residue** — process-group fingerprinting (ports, paths, class names).
 
 Steps 1–3 are controllable: emit the right attribute on spans and Latest picks it up. OneAgent auto-injects K8s attributes. OTel instrumentation sets `service.name` if you do.
 
@@ -31,7 +31,7 @@ Steps 1–3 are controllable: emit the right attribute on spans and Latest picks
 
 - K8s Spring Boot, no OTel: `service.name` empty → falls back to `k8s.workload.name`.
 - OTel app with `OTEL_SERVICE_NAME=foo`: `service.name=foo`, entity named `foo`.
-- Classic-detected service: ugly names, Module 2.3 covers the fix.
+- SDv1-detected service: ugly names, Module 2.3 covers the fix.
 
 ## In the Dynatrace UI
 

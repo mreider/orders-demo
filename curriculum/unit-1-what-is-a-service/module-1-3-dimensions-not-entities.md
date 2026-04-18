@@ -8,11 +8,11 @@ You're on one service in the Services app.
 
 > *"Which of my endpoints is the slowest?"*
 
-In Classic, the answer lived in a *different* service (OrderController was its own WEB_SERVICE). In Latest, they live on one entity and you split at query time.
+Under SDv1, the answer lived in a *different* service (OrderController was its own WEB_SERVICE). Under SDv2, they live on one entity and you split at query time.
 
 ## The claim
 
-What split into separate entities in Classic becomes a **dimension value** in Latest. Group or filter by the dimension to get the slice. Nothing new is created in the entity graph.
+What split into separate entities under SDv1 becomes a **dimension value** with SDv2. Group or filter by the dimension to get the slice. Nothing new is created in the entity graph.
 
 On HTTP:
 

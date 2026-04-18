@@ -24,13 +24,13 @@ style: |
 
 # Module 2.3 — The service.name workaround
 
-**Fix Classic-detected services today**
+**Fix SDv1-detected services today**
 
 ---
 
 # The question
 
-You have a Classic-detected service named `:8080`, `OrderController`, or a Java class path.
+You have a SDv1-detected service named `:8080`, `OrderController`, or a Java class path.
 
 - You can't query it cleanly by name
 - The old naming-rules overlay is deprecated
@@ -96,7 +96,7 @@ Four queries demonstrate:
 - Baseline: `dt.service.name = orders-demo - OrderController`
 - Named: `dt.service.name = orders-api (orders-demo - OrderController)`
 
-The prefix makes fragments legible as belonging to one logical service. Classic detection still fragments; the fix makes it query-friendly.
+The prefix makes fragments legible as belonging to one logical service. SDv1 detection still fragments; the fix makes it query-friendly.
 
 ---
 

@@ -5,16 +5,16 @@ last_updated: 2026-04-18
 
 # orders-demo
 
-A Spring Boot application + a 90-minute Dynatrace curriculum for existing customers migrating from Classic to the Latest Services app.
+A Spring Boot application + a 90-minute Dynatrace curriculum on the Service Detection v1 (SDv1) → Service Detection v2 (SDv2) migration for OneAgent-monitored workloads. SDv2 for OneAgent is available only on Latest Dynatrace tenants; the curriculum assumes a Latest tenant.
 
 ## What this is
 
 - A deliberately-small Spring Boot monolith (two REST controllers, a Kafka consumer, a JDBC client) deployed to Kubernetes.
 - The same image runs in two namespaces on the same cluster:
-  - `orders-sdv1` — Classic detection (SDv1), plus a second workload (`orders-demo-named`) with `OTEL_SERVICE_NAME` set, for the `service.name` workaround lab.
-  - `orders-sdv2` — opted into Latest detection (SDv2).
-- Identical traffic runs against each side. Every difference you see in the Dynatrace tenant is attributable to detection, not to the app.
-- A 13-module curriculum under `curriculum/` teaches the Classic→Latest transition. Each module is a short markdown narrative + an executable Dynatrace notebook that runs against the learner's own tenant, with the demo app as a fallback when the tenant lacks a workload with the right shape.
+  - `orders-sdv1` — SDv1 detection, plus a second workload (`orders-demo-named`) with `OTEL_SERVICE_NAME` set, for the `service.name` workaround lab.
+  - `orders-sdv2` — opted into SDv2 detection.
+- Identical traffic runs against each side. Every difference you see in the Dynatrace tenant is attributable to the detection model, not the app.
+- A 13-module curriculum under `curriculum/` teaches the SDv1 → SDv2 migration. Each module is a short markdown narrative + an executable Dynatrace notebook that runs against the learner's own tenant, with the demo app as a fallback when the tenant lacks a workload with the right shape.
 
 ## What this is for
 
