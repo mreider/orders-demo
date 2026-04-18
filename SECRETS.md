@@ -1,7 +1,7 @@
 ---
 title: Secrets required for the GitHub Actions workflows
-description: The five GitHub Secrets and the GCP service account setup needed to run cluster-up, build, and deploy.
-last_updated: 2026-04-17
+description: GitHub Secrets and the GCP service account setup needed to run cluster-up and deploy.
+last_updated: 2026-04-18
 ---
 
 # Secrets
@@ -11,28 +11,29 @@ repo's **Settings → Secrets and variables → Actions**, or via `gh secret set
 
 | Secret | Purpose | Used by |
 |---|---|---|
-| `GCP_PROJECT_ID` | GCP project that owns the GKE cluster and Artifact Registry | all workflows |
-| `GCP_SA_KEY` | JSON key for a service account with the roles below | all workflows |
+| `GCP_PROJECT_ID` | GCP project that owns the GKE cluster | cluster-up, cluster-down, deploy |
+| `GCP_SA_KEY` | JSON key for a service account with the roles below | cluster-up, cluster-down, deploy |
 | `DT_API_URL` | Full API URL, e.g. `https://abc12345.live.dynatrace.com/api` or `https://abc12345.dev.dynatracelabs.com/api` | cluster-up |
 | `DT_API_TOKEN` | API token with operator scopes | cluster-up |
 | `DT_DATA_INGEST_TOKEN` | Token with `metrics.ingest` + `openTelemetryTrace.ingest` | cluster-up |
 
+`build.yml` pushes the app image to `ghcr.io` using the repo's built-in `GITHUB_TOKEN` — no extra secret required.
+
 ## 1. GCP service account
 
 ```bash
-PROJECT=dynatrace-dev-on-demand   # or whichever
+PROJECT=your-gcp-project   # or whichever
 SA_NAME=orders-demo-ci
 SA_EMAIL="${SA_NAME}@${PROJECT}.iam.gserviceaccount.com"
 
 gcloud iam service-accounts create "$SA_NAME" \
   --display-name="orders-demo CI" --project="$PROJECT"
 
-# Roles required across the three workflows:
+# Roles required across the workflows:
 #   container.admin           - create/manage GKE cluster
-#   artifactregistry.admin    - create AR repo; push and pull images
 #   iam.serviceAccountUser    - attach default node SA to the cluster
 #   compute.networkAdmin      - optional, for VPC-native cluster creation
-for role in container.admin artifactregistry.admin iam.serviceAccountUser compute.networkAdmin; do
+for role in container.admin iam.serviceAccountUser compute.networkAdmin; do
   gcloud projects add-iam-policy-binding "$PROJECT" \
     --member="serviceAccount:${SA_EMAIL}" \
     --role="roles/${role}"
@@ -60,7 +61,7 @@ Tenant ID is the subdomain of your live URL: `https://abc12345.live.dynatrace.co
 ## 3. Set the secrets
 
 ```bash
-gh secret set GCP_PROJECT_ID --repo mreider/orders-demo --body "dynatrace-dev-on-demand"
+gh secret set GCP_PROJECT_ID --repo mreider/orders-demo --body "your-gcp-project"
 gh secret set GCP_SA_KEY --repo mreider/orders-demo < /tmp/orders-demo-ci.json
 gh secret set DT_API_URL --repo mreider/orders-demo --body "https://abc12345.live.dynatrace.com/api"
 gh secret set DT_API_TOKEN --repo mreider/orders-demo --body "<the-api-token-value>"

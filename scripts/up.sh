@@ -6,18 +6,18 @@
 #   DT_API_TOKEN           API token with operator scopes
 #   DT_DATA_INGEST_TOKEN   Token with metrics.ingest + openTelemetryTrace.ingest
 #
-# Optional env vars (with defaults):
-#   GCP_PROJECT            dynatrace-dev-on-demand
+# Optional env vars (defaults shown):
+#   GCP_PROJECT            your-gcp-project
 #   GKE_CLUSTER            orders-demo
 #   GKE_REGION             us-central1
 #   GKE_ZONE               us-central1-c
-#   AR_REPO                orders-demo
-#   IMAGE_TAG              1.0.0
-#   OPERATOR_VERSION       (resolved from GitHub latest release)
-#
-# Usage:
-#   DT_API_URL=https://abc.live.dynatrace.com/api \
-#   DT_API_TOKEN=... DT_DATA_INGEST_TOKEN=... ./scripts/up.sh
+#   ORDERS_IMAGE           ghcr.io/mreider/orders-demo:latest
+#                          (override to pull from your own registry)
+#   BUILD_LOCAL            unset = pull ORDERS_IMAGE from its registry
+#                          any value = build ./app and push to ORDERS_IMAGE
+#                          (BUILD_LOCAL also requires docker + credentials
+#                           for the target registry)
+#   OPERATOR_VERSION       (resolved from Dynatrace Operator latest release)
 
 set -euo pipefail
 
@@ -28,21 +28,19 @@ ROOT="$(cd "$HERE/.." && pwd)"
 : "${DT_API_TOKEN:?DT_API_TOKEN is required}"
 : "${DT_DATA_INGEST_TOKEN:?DT_DATA_INGEST_TOKEN is required}"
 
-GCP_PROJECT="${GCP_PROJECT:-dynatrace-dev-on-demand}"
+GCP_PROJECT="${GCP_PROJECT:-your-gcp-project}"
 GKE_CLUSTER="${GKE_CLUSTER:-orders-demo}"
 GKE_REGION="${GKE_REGION:-us-central1}"
 GKE_ZONE="${GKE_ZONE:-us-central1-c}"
-AR_REPO="${AR_REPO:-orders-demo}"
-IMAGE_TAG="${IMAGE_TAG:-1.0.0}"
-
-IMAGE_BASE="${GKE_REGION}-docker.pkg.dev/${GCP_PROJECT}/${AR_REPO}"
-export ORDERS_IMAGE="${IMAGE_BASE}/orders-demo:${IMAGE_TAG}"
+export ORDERS_IMAGE="${ORDERS_IMAGE:-ghcr.io/mreider/orders-demo:latest}"
 
 log() { printf '\n\033[1;36m[up] %s\033[0m\n' "$*"; }
 
 # ---- 1. prereqs ----
 log "Checking prerequisites"
-for bin in gcloud kubectl docker envsubst; do
+PREREQS="gcloud kubectl envsubst"
+[ -n "${BUILD_LOCAL:-}" ] && PREREQS="$PREREQS docker"
+for bin in $PREREQS; do
   command -v "$bin" >/dev/null || { echo "missing: $bin"; exit 1; }
 done
 
@@ -65,22 +63,17 @@ fi
 
 gcloud container clusters get-credentials "${GKE_CLUSTER}" --zone "${GKE_ZONE}"
 
-# ---- 3. Artifact Registry ----
-log "Ensuring Artifact Registry repo ${AR_REPO}"
-if ! gcloud artifacts repositories describe "${AR_REPO}" --location "${GKE_REGION}" >/dev/null 2>&1; then
-  gcloud artifacts repositories create "${AR_REPO}" \
-    --repository-format=docker \
-    --location="${GKE_REGION}"
+# ---- 3. app image ----
+if [ -n "${BUILD_LOCAL:-}" ]; then
+  log "Building ${ORDERS_IMAGE} locally"
+  (cd "${ROOT}/app" && docker build -t "${ORDERS_IMAGE}" .)
+  log "Pushing ${ORDERS_IMAGE}"
+  docker push "${ORDERS_IMAGE}"
+else
+  log "Using pre-built ${ORDERS_IMAGE} (set BUILD_LOCAL=1 to build from ./app)"
 fi
-gcloud auth configure-docker "${GKE_REGION}-docker.pkg.dev" --quiet
 
-# ---- 4. build + push app image ----
-log "Building ${ORDERS_IMAGE}"
-(cd "${ROOT}/app" && docker build -t "${ORDERS_IMAGE}" .)
-log "Pushing ${ORDERS_IMAGE}"
-docker push "${ORDERS_IMAGE}"
-
-# ---- 5. Dynatrace operator ----
+# ---- 4. Dynatrace operator ----
 OPERATOR_VERSION="${OPERATOR_VERSION:-$(curl -s https://api.github.com/repos/Dynatrace/dynatrace-operator/releases/latest | grep tag_name | head -1 | cut -d '"' -f 4)}"
 log "Installing Dynatrace Operator ${OPERATOR_VERSION}"
 kubectl create namespace dynatrace --dry-run=client -o yaml | kubectl apply -f -
@@ -90,7 +83,7 @@ kubectl -n dynatrace wait pod \
   --selector=app.kubernetes.io/name=dynatrace-operator \
   --timeout=300s
 
-# ---- 6. DynaKube secret + CR ----
+# ---- 5. DynaKube secret + CR ----
 log "Creating DynaKube secret"
 kubectl -n dynatrace create secret generic dynakube \
   --from-literal=apiToken="${DT_API_TOKEN}" \
@@ -100,8 +93,8 @@ kubectl -n dynatrace create secret generic dynakube \
 log "Applying DynaKube"
 sed "s|<DT_API_URL>|${DT_API_URL}|g" "${ROOT}/dynatrace/dynakube.yaml" | kubectl apply -f -
 
-# ---- 7. namespaces + infra + app ----
-log "Applying namespaces and infra"
+# ---- 6. namespaces + infra + apps ----
+log "Applying namespaces and infra (Postgres + Redpanda in each namespace)"
 kubectl apply -f "${ROOT}/k8s/00-namespaces.yaml"
 kubectl apply -f "${ROOT}/k8s/10-postgres.yaml"
 kubectl apply -f "${ROOT}/k8s/20-redpanda.yaml"
@@ -113,13 +106,15 @@ for ns in orders-sdv1 orders-sdv2; do
 done
 
 log "Applying app Deployments (image: ${ORDERS_IMAGE})"
-envsubst < "${ROOT}/k8s/30-app.yaml" | kubectl apply -f -
+envsubst < "${ROOT}/k8s/30-app.yaml"       | kubectl apply -f -
+envsubst < "${ROOT}/k8s/31-app-named.yaml" | kubectl apply -f -
 
 for ns in orders-sdv1 orders-sdv2; do
   kubectl -n "${ns}" rollout status deployment/orders-demo --timeout=300s
 done
+kubectl -n orders-sdv1 rollout status deployment/orders-demo-named --timeout=300s
 
-# ---- 8. load gen (create ConfigMap from the real k6 script, then apply Job) ----
+# ---- 7. load gen ----
 log "Creating load-gen ConfigMaps from load/loadtest.js"
 for ns in orders-sdv1 orders-sdv2; do
   kubectl -n "${ns}" create configmap loadtest-script \
@@ -128,32 +123,31 @@ for ns in orders-sdv1 orders-sdv2; do
 done
 
 log "Applying load Jobs"
-# The manifest re-declares the ConfigMap as a placeholder; we have the real
-# ConfigMap above, so apply just the Job parts. envsubst is not needed here.
 kubectl apply -f "${ROOT}/k8s/40-load.yaml"
+kubectl apply -f "${ROOT}/k8s/41-load-named.yaml"
 
-# ---- 9. final instructions ----
+# ---- 8. next steps ----
 cat <<EOF
 
 ======================================================================
-Orders-demo is deploying.
+orders-demo is deploying.
 
 Next steps (manual):
 
-1. In the Dynatrace UI, go to Kubernetes Classic > ${GKE_CLUSTER} >
-   namespace 'orders-sdv2' > Settings > Service detection >
-   Service Detection v2 for OneAgent > enable.
+1. Opt orders-sdv2 into SDv2 detection:
+   Dynatrace UI > Kubernetes > ${GKE_CLUSTER} > namespace orders-sdv2
+   > Settings > Service detection > Service Detection v2 for OneAgent > enable.
+   (Leave orders-sdv1 on default SDv1.)
 
-   Leave 'orders-sdv1' on default (SDv1).
+2. Wait ~5 minutes for the UNIFIED entity to appear.
 
-2. Wait about 15 minutes for baselines to form.
+3. Load the curriculum notebooks into your tenant:
+   export DT_ENV=https://<your-tenant>.apps.dynatrace.com
+   export DT_PLATFORM_TOKEN=dt0s16.XXXX...
+   ./scripts/load-curriculum.sh
 
-3. Walk the ladder starting at:
-   ${ROOT}/docs/00-anchor.md
-
-4. For Rung 3 (namespace-is-a-dimension), apply the staging manifest:
-   kubectl apply -f ${ROOT}/k8s/50-sdv2-staging.yaml
-   Then opt that namespace into SDv2 the same way as step 1.
+4. Walk the curriculum:
+   Notebooks app > filter "Curriculum /" > Module 0 > run in order.
 
 Teardown: ./scripts/down.sh
 ======================================================================

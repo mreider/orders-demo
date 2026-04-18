@@ -20,7 +20,7 @@ A Spring Boot application + a 90-minute Dynatrace curriculum for existing custom
 
 - **Field enablement** — a reproducible hands-on for customers evaluating SDv2 or planning the move.
 - **Self-paced learning** — customers load the notebooks into their own tenant and walk the curriculum in ~90 minutes.
-- **Slide source of truth** — each module also produces editable PPTX for ILT sessions via [`md-to-pptx`](https://bitbucket.lab.dynatrace.org/scm/~matthew.reider/md-to-dt-pptx.git).
+- **Slide source of truth** — each module ships an editable PPTX alongside the Marp markdown source (see below).
 
 ## What this is not
 
@@ -50,14 +50,31 @@ notebooks/    home.yaml — the curriculum's landing notebook
 
 ## Slides
 
-Each module ships with an editable `.pptx` alongside its `.slides.md` Marp
-source. To rebuild after editing a deck:
+Each module ships with an editable `.pptx` alongside its `.slides.md`
+Marp source. For most uses the committed PPTX files are enough — open
+them in PowerPoint, edit freely. If you need to rebuild from the Marp
+source (after editing `.slides.md`), run:
 
 ```bash
 ./scripts/build-slides.sh
 ```
 
-Requires [md-to-pptx](https://bitbucket.lab.dynatrace.org/scm/~matthew.reider/md-to-dt-pptx.git) cloned at `../md-to-pptx` (or set `MDTPPX_DIR`).
+The rebuild uses a Marp→PptxGenJS converter (`md-to-pptx`). If you
+don't have one, any Marp-compatible tool that produces editable PPTX
+will do; point `MDTPPX_DIR` at its path or edit `build-slides.sh` to
+call your tool.
+
+## Container image
+
+The app image is built by `.github/workflows/build.yml` on every push
+to `main` and published to the GitHub Container Registry:
+
+- `ghcr.io/mreider/orders-demo:latest`
+- `ghcr.io/mreider/orders-demo:<sha>`
+
+`scripts/up.sh` pulls `:latest` by default, so you don't need to build
+locally. Set `BUILD_LOCAL=1` and/or override `ORDERS_IMAGE` if you want
+to build from source and push to your own registry.
 
 ## Releases
 
@@ -67,4 +84,9 @@ Tag and push to cut a GitHub Release that bundles:
 - `curriculum-notebooks-<tag>.zip` — 11 lab YAMLs + home notebook.
 - `curriculum-full-<tag>.tar.gz` — the whole teaching tree (markdown + YAML + slides + PPTX + SETUP.md).
 
-The app image itself is built by `.github/workflows/build.yml` into Artifact Registry on every push to `main`; it's not a release artifact.
+The app image is not a release artifact — `build.yml` already pushes
+it to `ghcr.io` on every main-branch commit.
+
+## License
+
+[MIT](LICENSE).

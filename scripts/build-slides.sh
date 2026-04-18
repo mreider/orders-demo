@@ -25,9 +25,10 @@ ROOT="$(cd "$HERE/.." && pwd)"
 MDTPPX_DIR="${MDTPPX_DIR:-$(cd "$ROOT/.." && pwd)/md-to-pptx}"
 
 if [ ! -f "$MDTPPX_DIR/build-pptx.cjs" ]; then
-  echo "error: md-to-pptx not found at $MDTPPX_DIR" >&2
-  echo "       clone https://bitbucket.lab.dynatrace.org/scm/~matthew.reider/md-to-dt-pptx.git" >&2
-  echo "       and run 'npm install' in it, or set MDTPPX_DIR to its location." >&2
+  echo "error: Marp→PPTX converter not found at $MDTPPX_DIR" >&2
+  echo "       expected a build-pptx.cjs script that takes (input.md, output.pptx)." >&2
+  echo "       set MDTPPX_DIR to the directory containing build-pptx.cjs, or" >&2
+  echo "       edit this script to call whichever Marp→editable-PPTX tool you prefer." >&2
   exit 1
 fi
 

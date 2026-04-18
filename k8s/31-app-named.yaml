@@ -6,8 +6,8 @@
 #
 # The learner sees the effect in three places:
 #   1. Entity display name   - "orders-api (orders-demo-named)" vs "orders-demo"
-#      (the "orders-api" prefix comes from the detection-layer fix shipped for
-#       Dell/UHG on 2026-03-05 when service.name is set as a resource attribute)
+#      (the "orders-api" prefix comes from a 2026-Q1 detection-layer fix
+#       that prefixes the detected Classic name with service.name when set)
 #   2. Metric dimension      - service.name == "orders-api" on dt.service.*
 #   3. Query ergonomics      - filter: service.name == "orders-api" works,
 #                              no entity-table lookup needed
@@ -44,7 +44,7 @@ spec:
     spec:
       containers:
         - name: orders-demo-named
-          image: ${ORDERS_IMAGE}
+          image: ${ORDERS_IMAGE:-ghcr.io/mreider/orders-demo:latest}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

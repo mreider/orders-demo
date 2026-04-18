@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-GCP_PROJECT="${GCP_PROJECT:-dynatrace-dev-on-demand}"
+GCP_PROJECT="${GCP_PROJECT:-your-gcp-project}"
 GKE_CLUSTER="${GKE_CLUSTER:-orders-demo}"
 GKE_ZONE="${GKE_ZONE:-us-central1-c}"
 GKE_REGION="${GKE_REGION:-us-central1}"

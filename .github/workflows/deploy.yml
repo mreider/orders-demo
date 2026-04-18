@@ -6,23 +6,19 @@ on:
       image_tag:
         description: "Image tag to deploy (e.g. commit SHA short or 'latest')"
         default: "latest"
-      apply_staging:
-        description: "Also apply k8s/50-sdv2-staging.yaml (Rung 3)"
-        type: boolean
-        default: false
   workflow_run:
     workflows: [build]
     types: [completed]
 
 permissions:
   contents: read
+  packages: read
 
 env:
   GKE_CLUSTER: orders-demo
   GKE_ZONE: us-central1-c
-  GKE_REGION: us-central1
-  AR_REPO: orders-demo
-  IMAGE_NAME: orders-demo
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   deploy:
@@ -52,11 +48,10 @@ jobs:
         id: image
         run: |
           TAG="${{ inputs.image_tag || 'latest' }}"
-          # When triggered by workflow_run, prefer the short SHA of the head commit.
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             TAG="${GITHUB_SHA::7}"
           fi
-          REF="${GKE_REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${AR_REPO}/${IMAGE_NAME}:${TAG}"
+          REF="${REGISTRY}/${IMAGE_NAME}:${TAG}"
           echo "ORDERS_IMAGE=$REF" >> "$GITHUB_ENV"
           echo "::notice::Deploying $REF"
 
@@ -72,12 +67,14 @@ jobs:
 
       - name: Apply app Deployments (with image substitution)
         run: |
-          envsubst < k8s/30-app.yaml | kubectl apply -f -
+          envsubst < k8s/30-app.yaml       | kubectl apply -f -
+          envsubst < k8s/31-app-named.yaml | kubectl apply -f -
           for ns in orders-sdv1 orders-sdv2; do
             kubectl -n "$ns" rollout status deployment/orders-demo --timeout=300s
           done
+          kubectl -n orders-sdv1 rollout status deployment/orders-demo-named --timeout=300s
 
-      - name: Apply load generator
+      - name: Apply load generators
         run: |
           for ns in orders-sdv1 orders-sdv2; do
             kubectl -n "$ns" create configmap loadtest-script \
@@ -85,17 +82,9 @@ jobs:
               --dry-run=client -o yaml | kubectl apply -f -
           done
           kubectl apply -f k8s/40-load.yaml
-
-      - name: Apply staging namespace (Rung 3)
-        if: ${{ inputs.apply_staging == true }}
-        run: |
-          envsubst < k8s/50-sdv2-staging.yaml | kubectl apply -f -
-          kubectl -n orders-sdv2-staging create configmap loadtest-script \
-            --from-file=loadtest.js=load/loadtest.js \
-            --dry-run=client -o yaml | kubectl apply -f -
-          kubectl -n orders-sdv2-staging rollout status deployment/orders-demo --timeout=300s
+          kubectl apply -f k8s/41-load-named.yaml
 
       - name: Summary
         run: |
           echo "::notice::Deployed $ORDERS_IMAGE"
-          echo "::notice::Next: opt orders-sdv2 into SDv2 in the Dynatrace UI. See dynatrace/install.md step 5."
+          echo "::notice::Next: opt orders-sdv2 into SDv2 in the Dynatrace UI."

@@ -80,7 +80,7 @@ export DT_API_TOKEN="dt0c01.XXXX…"
 export DT_DATA_INGEST_TOKEN="dt0c01.YYYY…"
 
 # Optional overrides (defaults shown)
-export GCP_PROJECT="${GCP_PROJECT:-dynatrace-dev-on-demand}"
+export GCP_PROJECT="${GCP_PROJECT:-your-gcp-project}"
 export GKE_CLUSTER="${GKE_CLUSTER:-orders-demo}"
 export GKE_REGION="${GKE_REGION:-us-central1}"
 export GKE_ZONE="${GKE_ZONE:-us-central1-c}"
