@@ -6,9 +6,11 @@ name: release
 # `scripts/build-slides.sh` locally and commit before tagging.
 #
 # Artifacts:
-#   curriculum-slides-<tag>.zip      — all 13 PPTX decks + their Marp source
+#   curriculum-slides-<tag>.zip      — all 13 PPTX decks + their Marp source (bundle)
 #   curriculum-notebooks-<tag>.zip   — lab notebook YAMLs + home notebook
 #   curriculum-full-<tag>.tar.gz     — markdown + YAML + slides + PPTX + SETUP.md
+#   module-*.pptx                    — each deck attached individually for one-click
+#                                      download on the release page
 #
 # The app image is not a release artifact. build.yml pushes it to
 # ghcr.io on every main-branch push, tagged by short SHA and :latest.
@@ -33,6 +35,7 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           mkdir -p dist
 
+          # Three bundles (aggregate downloads)
           find curriculum -type f \( -name '*.pptx' -o -name '*.slides.md' \) \
             | zip -@ "dist/curriculum-slides-${TAG}.zip"
 
@@ -43,6 +46,9 @@ jobs:
           tar --exclude='*.DS_Store' -czf "dist/curriculum-full-${TAG}.tar.gz" \
             curriculum notebooks/home.yaml SETUP.md curriculum/README.md
 
+          # Individual PPTX per module (one-click download)
+          find curriculum -name '*.pptx' -exec cp {} dist/ \;
+
           ls -la dist/
 
       - name: Create GitHub Release
@@ -52,15 +58,18 @@ jobs:
           body: |
             ## orders-demo ${{ github.ref_name }}
 
-            **Artifacts**
+            **Bundles**
 
-            - `curriculum-slides-${{ github.ref_name }}.zip` — 13 editable PPTX decks + Marp source.
+            - `curriculum-slides-${{ github.ref_name }}.zip` — all 13 editable PPTX decks + Marp source.
             - `curriculum-notebooks-${{ github.ref_name }}.zip` — 11 lab YAMLs + home notebook.
             - `curriculum-full-${{ github.ref_name }}.tar.gz` — the whole teaching tree (narrative markdown + labs + slides + home notebook + setup guide).
+
+            **Per-module slides** (below) are each also attached individually for one-click download.
 
             See [SETUP.md](SETUP.md) for how to load into your tenant.
           files: |
             dist/curriculum-slides-*.zip
             dist/curriculum-notebooks-*.zip
             dist/curriculum-full-*.tar.gz
+            dist/module-*.pptx
           generate_release_notes: true
