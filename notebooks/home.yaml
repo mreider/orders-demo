@@ -1,5 +1,5 @@
 id: c2a2885e-1da9-4c4b-80fa-ebdda5d42f2c
-name: "orders-demo / HOME - SDv1 vs SDv2 splitting ladder"
+name: "Services in Latest Dynatrace - Curriculum Home"
 type: notebook
 content:
   defaultTimeframe:
@@ -9,141 +9,130 @@ content:
     - id: 00000000-0000-0000-ffff-000000000001
       type: markdown
       markdown: |-
-        # orders-demo: SDv1 vs SDv2 splitting ladder
+        # Services in Latest Dynatrace - Curriculum Home
 
-        A walkable comparison of how **SDv1 splits a workload into
-        multiple service entities** vs. how **SDv2 keeps one entity and
-        splits the same axes as metric dimensions**. Same Spring Boot
-        app, deployed to two Kubernetes namespaces, each under a
-        different detection model. Live queries against the tenant.
+        A hands-on course for existing Dynatrace customers on how the
+        Latest Services app models services, where its design differs
+        from Classic, and what to do today for features still in flight.
 
-        ## The one idea the ladder teaches
+        Every module pairs a short concept narrative (GitHub markdown)
+        with an executable lab notebook (in this tenant). The course
+        takes ~4 hours end-to-end; each module is a self-contained 15-20
+        minute unit. Run them in order.
 
-        > SDv1's unit of slicing is the **entity**. Controllers become
-        > separate WEB_SERVICE entities, Kafka listeners become
-        > MESSAGING_SERVICE entities, each namespace gets its own copy.
-        > Health is measured per entity.
-        >
-        > SDv2's unit of slicing is the **attribute**. One UNIFIED
-        > entity per workload. Controllers, listeners, and destinations
-        > become values of `endpoint.name` and
-        > `messaging.destination.name` on that single identity. Health
-        > is measured per dimension.
-        >
-        > Everything else in the ladder is worked examples.
+        > **The single idea the curriculum teaches:**
+        > Latest Dynatrace moved the unit of slicing from **entity** to
+        > **attribute**. One workload = one service entity, with
+        > dimensions that carry what used to require multiple entities
+        > to represent. Every module below is a worked consequence of
+        > that one shift.
 
-        ## Why the two models exist
+        ## Before you start
 
-        SDv1 was designed for an era when one JVM hosted many *logically
-        distinct* services. Classic J2EE monoliths on WebSphere or
-        WebLogic bundled EJB session beans, message-driven beans,
-        servlets, and JAX-RS resources from multiple WARs under a
-        single process - often owned by different teams shipping under
-        a single EAR. Splitting by controller class, listener class,
-        and host group surfaced those genuinely-distinct services as
-        their own observable entities. That matched reality.
+        Read [Module 0 - Lab setup](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-1-what-is-a-service/module-0-lab-setup.md)
+        to ensure your tenant is loaded with the companion notebooks.
+        One-time `dtctl apply` loop covers it.
 
-        For modern Spring Boot and microservice workloads, that shape
-        doesn't fit. One runnable JAR, one team, one deployment unit:
-        the JVM *is* the service. SDv1's splits inside a microservice
-        produce **faux entities** - they look like independent services
-        but are just parts of the same thing. Teams end up rebuilding
-        dashboards to aggregate them back together, because that's how
-        they conceptually relate.
-
-        SDv2 aligns identity with the deployment unit (k8s workload,
-        Lambda function, ECS task). Controllers, listeners, and
-        endpoints inside a workload become dimensions of the one
-        service - which matches how modern microservices are actually
-        shipped and owned. The historical case for class-level
-        entity-splitting still exists for true monoliths; it just
-        isn't what most Spring Boot apps need today.
-
-        ## Walk the rungs in order
     - id: 00000000-0000-0000-ffff-000000000002
       type: markdown
       markdown: |-
-        | # | Notebook | What it teaches |
+        ## Unit 1: What is a service, really?
+
+        The foundational shift: from entity-first to attribute-first.
+
+        | # | Concept (narrative) | Lab (in this tenant) |
         |---|---|---|
-        | 00 | [Anchor: SDv1 splitting vs SDv2 splitting](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/fc559cb4-56b3-4a47-bb96-e405e632f4b6) | Both models' entity surface side-by-side. Counts the splits each produces from one JVM. |
-        | 01 | [Optimally sliced SDv1 - entity is the unit](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/6067564b-95e5-4734-9cd5-b1de50af07e8) | Enhanced endpoints on, per-controller entities stay, per-method endpoints appear. Config surface that remains. |
-        | 02 | [Optimally sliced SDv2 - attribute is the unit](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/aed7e9c5-2d64-4dba-b2a1-1ab40655d92c) | One UNIFIED entity. Endpoints, messaging destinations, and http status all surface as dimension values. Why the `ClassName.method` naming (OneAgent Java sensor mechanism). |
-        | 03 | [Measuring HTTP health both ways](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/44ee1f18-e69c-4c5d-b3e7-040410e568ae) | Three concrete HTTP questions, each answered in both idioms. Same arithmetic, different `filter` clause. Where the SDv1 cross-entity aggregation tax shows up. |
-        | 04 | [Measuring messaging health both ways](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/e19926bf-7f6f-4af6-b5c5-c4b8502549c0) | Same comparison for the Kafka consumer. SDv1 puts it on a separate MESSAGING_SERVICE entity; SDv2 keeps it on the UNIFIED service as a `messaging.destination.name` dimension. What happens when a second listener is added. |
-        | 05 | [Measuring end-to-end failure both ways](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/f8eb3be6-9fda-4f83-bdd3-c8d14409c490) | The HTTP->Kafka seam with 2% seeded bad messages. SDv1 fragments failure ownership across two entities; SDv2 sums failure counts on one identity. `transaction.is_failed` as the unified span-level indicator. |
-        | 06 | [Where this is going](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/1df0ab23-5384-4c5a-ba73-5237d527a6f6) | URL path normalization (the real `http.route` gap, for frameworks without it). Consumer-span endpoint removal. SERVICE_DEPLOYMENT. Phase 3 classic-type collapse. Pattern detection. |
+        | **1.1** | [One workload, one service](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-1-what-is-a-service/module-1-1-one-workload-one-service.md) | Notebooks app > "Curriculum / Module 1.1" |
+        | **1.2** | [The three transport families](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-1-what-is-a-service/module-1-2-three-transport-families.md) | Notebooks app > "Curriculum / Module 1.2" |
+        | **1.3** | [Dimensions, not entities, split the view](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-1-what-is-a-service/module-1-3-dimensions-not-entities.md) | Notebooks app > "Curriculum / Module 1.3" |
+        | **1.4** | [Classic vs Latest, side by side](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-1-what-is-a-service/module-1-4-classic-vs-latest.md) | Notebooks app > "Curriculum / Module 1.4" |
+
     - id: 00000000-0000-0000-ffff-000000000003
       type: markdown
       markdown: |-
-        ## What is live on this tenant
+        ## Unit 2: Naming and identity
 
-        Both namespaces run the same Spring Boot app. The only
-        difference is which detection model is active.
+        Where service names come from, why metric-first queries are
+        shorter, how to fix Classic services today, what's in flight.
 
-        - **`orders-sdv1` namespace** - SDv1 detection with
-          **enhanced endpoints enabled**
-          (`builtin:enhanced-endpoints-for-sdv1`, scope =
-          `CLOUD_APPLICATION_NAMESPACE-A35DA102BB54BC76`).
-        - **`orders-sdv2` namespace** - SDv2 enabled via
-          `builtin:service-detection-v2-for-oneagent` (scope =
-          `CLOUD_APPLICATION_NAMESPACE-A6537BAAF384A1F2`,
-          `enableSDV2ForKubernetesWorkloads=true`).
+        | # | Concept (narrative) | Lab |
+        |---|---|---|
+        | **2.1** | [Where names come from](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-2-naming-identity/module-2-1-where-names-come-from.md) | "Curriculum / Module 2.1" |
+        | **2.2** | [Metric-first queries](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-2-naming-identity/module-2-2-metric-first-queries.md) | "Curriculum / Module 2.2" |
+        | **2.3** | [The `service.name` workaround](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-2-naming-identity/module-2-3-service-name-workaround.md) | "Curriculum / Module 2.3" |
+        | **2.4** | [What's coming: pipeline-side naming](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-2-naming-identity/module-2-4-whats-coming-pipeline-naming.md) | *forward-looking, no lab* |
 
-        Load is generated by k6 in each namespace - 70/25/5 iter/s mix
-        of `POST /orders/submit`, `GET /orders/search`,
-        `GET /inventory/check`. The submit path seeds 2% bad messages
-        to Kafka, which the `@KafkaListener` rejects - the bad-message
-        trail is what Rung 5 observes.
-
-        **The k6 Job runs for 30 minutes then completes.** If live
-        data is stale, re-apply `k8s/40-load.yaml` in the repo.
     - id: 00000000-0000-0000-ffff-000000000004
       type: markdown
       markdown: |-
-        ## Quick sanity check that the tenant has data
+        ## Unit 3: Endpoints, dependencies, scale
 
-        Every rung depends on live metrics from the workload. If this
-        query returns 0 rows, the loadgens have stopped - restart
-        them before walking further.
+        Endpoints, downstream calls, and the additive entity that
+        replaces environment-based service splitting.
+
+        | # | Concept (narrative) | Lab |
+        |---|---|---|
+        | **3.1** | [Every endpoint is baselined](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-3-endpoints-deps-scale/module-3-1-every-endpoint-baselined.md) | "Curriculum / Module 3.1" |
+        | **3.2** | [When `http.route` is missing](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-3-endpoints-deps-scale/module-3-2-when-http-route-missing.md) | "Curriculum / Module 3.2" |
+        | **3.3** | [Downstreams are tabs, not entities](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-3-endpoints-deps-scale/module-3-3-downstreams-are-tabs.md) | "Curriculum / Module 3.3" |
+        | **3.4** | [What's coming: SERVICE_DEPLOYMENT](https://github.com/mreider/orders-demo/blob/main/curriculum/unit-3-endpoints-deps-scale/module-3-4-whats-coming-service-deployment.md) | *forward-looking, no lab* |
+
     - id: 00000000-0000-0000-ffff-000000000005
+      type: markdown
+      markdown: |-
+        ## Capstone
+
+        [Capstone - one service, full walkthrough](https://github.com/mreider/orders-demo/blob/main/curriculum/capstone/capstone.md) | "Curriculum / Capstone"
+
+        A single notebook that runs the whole narrative end-to-end on
+        a workload you pick. No new concepts. Share the URL with a
+        colleague as a self-serve onboarding artifact.
+
+    - id: 00000000-0000-0000-ffff-000000000006
+      type: markdown
+      markdown: |-
+        ## Tenant check: is the demo workload running?
+
+        Several labs reference the companion `orders-demo` application
+        when a learner's tenant doesn't have the right shape. This
+        query confirms whether the demo is currently deployed in this
+        tenant and producing traffic.
+
+    - id: 00000000-0000-0000-ffff-000000000007
       type: dql
       state:
         input:
           value: |-
             timeseries cnt = sum(dt.service.request.count),
-              by: { dt.entity.service, endpoint.name },
+              by: {k8s.namespace.name, k8s.workload.name},
+              filter: matchesValue(k8s.workload.name, "orders-demo")
+                   OR matchesValue(k8s.workload.name, "orders-demo-named"),
               from: now()-5m
-            | lookup [fetch dt.entity.service | fields id, entity.name, serviceType],
-                sourceField: dt.entity.service, lookupField: id, prefix: "svc."
-            | filter contains(svc.entity.name, "orders-demo") OR contains(svc.entity.name, "OrderEvents")
-            | fieldsAdd detection = if(svc.serviceType == "UNIFIED", "SDv2", else: "SDv1")
-            | summarize endpoints = countDistinct(endpoint.name), total = sum(arraySum(cnt)),
-                by: { detection, svc.entity.name, svc.serviceType }
-            | sort detection asc, svc.entity.name asc
+            | sort k8s.namespace.name asc, k8s.workload.name asc
           timeframe:
             from: now()-5m
             to: now()
         visualization: table
-    - id: 00000000-0000-0000-ffff-000000000006
+
+    - id: 00000000-0000-0000-ffff-000000000008
       type: markdown
       markdown: |-
         **Result reading:**
 
-        - Expected: rows for both `orders-sdv1` side entities (WEB_SERVICE,
-          MESSAGING_SERVICE, WEB_REQUEST_SERVICE) and the single
-          `orders-sdv2 -- orders-demo` UNIFIED entity.
-        - If `total` is 0 or NULL anywhere, loadgens have stopped - see
-          the k6 Job section above.
-        - This one query already previews the pedagogy: SDv1 produces
-          several rows (the splits), SDv2 produces one row (the lack of
-          split).
+        - Expected when demo is live:
+          - `orders-sdv1` + `orders-demo` (baseline Classic workload)
+          - `orders-sdv1` + `orders-demo-named` (with `OTEL_SERVICE_NAME=orders-api`)
+          - `orders-sdv2` + `orders-demo` (Latest detection)
+        - Zero rows -> demo loadgens have stopped. Re-apply the k6 Jobs:
+          `kubectl apply -f k8s/40-load.yaml k8s/41-load-named.yaml` in
+          the [orders-demo repo](https://github.com/mreider/orders-demo).
 
-        ## Where to start
+    - id: 00000000-0000-0000-ffff-000000000009
+      type: markdown
+      markdown: |-
+        ## Source
 
-        New to this ladder -> open [Rung 0 Anchor](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/fc559cb4-56b3-4a47-bb96-e405e632f4b6).
-
-        Already know the SDv1 side -> jump to [Rung 2 Optimally sliced SDv2](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/aed7e9c5-2d64-4dba-b2a1-1ab40655d92c).
-
-        Want the "what's changing" summary only -> read [Rung 6 Where this is going](https://abl46885.dev.apps.dynatracelabs.com/ui/apps/dynatrace.notebooks/notebook/1df0ab23-5384-4c5a-ba73-5237d527a6f6).
-
-        Source + docs (markdown companions, one per rung): `docs/00-anchor.md` through `docs/06-roadmap.md` in the `mreider/orders-demo` repo.
+        Full curriculum lives in the
+        [orders-demo](https://github.com/mreider/orders-demo)
+        repository under `curriculum/`. Feedback, PRs, and lab-query
+        bugfixes welcome there.

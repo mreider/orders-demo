@@ -1,0 +1,120 @@
+name: "Curriculum / Module 3.1 - Every endpoint is baselined"
+type: notebook
+content:
+  defaultTimeframe:
+    from: now()-24h
+    to: now()
+  sections:
+    - id: 00000000-0000-0000-3101-000000000001
+      type: markdown
+      markdown: |-
+        # Module 3.1 - Every endpoint is baselined
+
+        *Unit 3: Endpoints, dependencies, scale - Module 1 of 4.*
+
+        Pick a service in your tenant that sees real traffic (ideally a
+        production service you know well). Two queries show you that
+        every endpoint has per-endpoint data, and compare what you would
+        have seen in Classic with only key requests marked.
+
+        Replace `<YOUR_SERVICE_NAME>` with the dt.service.name value for
+        your service.
+
+    - id: 00000000-0000-0000-3101-000000000002
+      type: markdown
+      markdown: |-
+        ## Question 1: What endpoints does this service have?
+
+        The full endpoint surface - including the long tail you wouldn't
+        have marked as key requests.
+
+    - id: 00000000-0000-0000-3101-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries {
+              throughput  = sum(dt.service.request.count),
+              avg_rt      = avg(dt.service.request.response_time),
+              p95_rt      = percentile(dt.service.request.response_time, 95),
+              failures    = sum(dt.service.request.failure_count)
+            },
+            by: {endpoint.name},
+            filter: matchesValue(dt.service.name, "<YOUR_SERVICE_NAME>"),
+            from: now()-24h
+            | filter endpoint.name != ""
+            | sort arraySum(throughput) desc
+            | limit 30
+          timeframe:
+            from: now()-24h
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-3101-000000000004
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        Each row is an endpoint with its own throughput, latency, and
+        failure picture. In Classic, only your explicitly-marked key
+        requests would have this level of detail. The rest rolled up
+        into `NON_KEY_REQUESTS`.
+
+        Now look at the bottom of the list. The low-throughput rows are
+        exactly the endpoints that never would have made the cut as key
+        requests - the administrative paths, health probes, rarely-used
+        features. They're all baselined now.
+
+    - id: 00000000-0000-0000-3101-000000000005
+      type: markdown
+      markdown: |-
+        ## Question 2: Confirm baselines exist per endpoint
+
+        Anomaly detection and baseline values live on the same metric
+        dimensions. This query confirms that response-time baselines
+        are available split by endpoint.name.
+
+    - id: 00000000-0000-0000-3101-000000000006
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries {
+              rt_p50 = percentile(dt.service.request.response_time, 50),
+              rt_p95 = percentile(dt.service.request.response_time, 95),
+              rt_p99 = percentile(dt.service.request.response_time, 99)
+            },
+            by: {endpoint.name},
+            filter: matchesValue(dt.service.name, "<YOUR_SERVICE_NAME>"),
+            from: now()-24h
+            | filter endpoint.name != ""
+            | sort arraySum(rt_p95) desc
+            | limit 10
+          timeframe:
+            from: now()-24h
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-3101-000000000007
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        Percentiles rendered per endpoint over 24 hours. Under Classic,
+        only key requests would give you this chart. Under Latest,
+        every endpoint does - no configuration required.
+
+    - id: 00000000-0000-0000-3101-000000000008
+      type: markdown
+      markdown: |-
+        ## What you just learned
+
+        1. Latest Dynatrace baselines every endpoint automatically.
+           No key-request configuration.
+        2. The cost/insight tradeoff of "pick a few endpoints, accept
+           the rest as a blob" is gone. Every endpoint is a dimension
+           value, and every dimension value has a baseline.
+        3. Existing key-request configs are preserved as named endpoints
+           during the transition.
+
+        **Next:** [Module 3.2 - When http.route is missing](#).

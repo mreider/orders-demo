@@ -1,0 +1,34 @@
+# Load generator for the orders-demo-named workload in orders-sdv1. Reuses the
+# same loadtest-script ConfigMap as 40-load.yaml - only the BASE_URL differs.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: loadgen-named
+  namespace: orders-sdv1
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: loadgen-named
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: grafana/k6:0.54.0
+          args: ["run", "/scripts/loadtest.js"]
+          env:
+            - name: BASE_URL
+              value: http://orders-demo-named:8080
+            - name: DURATION
+              value: "30m"
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "256Mi" }
+      volumes:
+        - name: script
+          configMap:
+            name: loadtest-script

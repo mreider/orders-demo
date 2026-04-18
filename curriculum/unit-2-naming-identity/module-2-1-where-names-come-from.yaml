@@ -1,0 +1,157 @@
+name: "Curriculum / Module 2.1 - Where names come from"
+type: notebook
+content:
+  defaultTimeframe:
+    from: now()-30m
+    to: now()
+  sections:
+    - id: 00000000-0000-0000-2101-000000000001
+      type: markdown
+      markdown: |-
+        # Module 2.1 - Where names come from
+
+        *Unit 2: Naming and identity - Module 1 of 4.*
+
+        Three queries trace the naming chain from raw span attributes
+        through to the entity display name. Pick a workload you can run
+        these against - any K8s workload in your tenant, or the
+        companion `orders-demo` workloads.
+
+    - id: 00000000-0000-0000-2101-000000000002
+      type: markdown
+      markdown: |-
+        ## Question 1: What resource attributes actually arrive on spans?
+
+        This is the raw input the Latest detection model reads from.
+
+    - id: 00000000-0000-0000-2101-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch spans, from: now()-30m
+            | filter matchesValue(k8s.namespace.name, "<YOUR_NAMESPACE>")
+                AND matchesValue(k8s.workload.name, "<YOUR_WORKLOAD>")
+            | summarize span_count = count(),
+                by: {service.name, k8s.workload.name, k8s.namespace.name,
+                     k8s.cluster.name, host.name}
+            | sort span_count desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-2101-000000000004
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        - `service.name` populated -> the app (or OneAgent OTel
+          integration) is setting it as a resource attribute. This takes
+          precedence in naming.
+        - `service.name` empty -> the workload name from Kubernetes is
+          what Dynatrace will use instead.
+
+        If your rows all have identical values for every column, that's
+        a sign of well-structured resource attributes - spans are tagged
+        consistently. Ragged rows mean inconsistent instrumentation.
+
+    - id: 00000000-0000-0000-2101-000000000005
+      type: markdown
+      markdown: |-
+        ## Question 2: Which attribute produced the entity name?
+
+        Correlate: span resource attributes on the left, resulting
+        dt.service.name dimension on the right.
+
+    - id: 00000000-0000-0000-2101-000000000006
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries cnt = sum(dt.service.request.count),
+            by: {dt.service.name, service.name, k8s.workload.name},
+            filter: matchesValue(k8s.namespace.name, "<YOUR_NAMESPACE>"),
+            from: now()-30m
+            | fields dt.service.name, service.name, k8s.workload.name
+            | sort dt.service.name asc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-2101-000000000007
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        - `dt.service.name` matches `service.name` exactly -> OTel
+          resource attribute won (step 1 of the fallback chain).
+        - `dt.service.name` matches `k8s.workload.name` or is
+          `<namespace> -- <workload>` -> K8s fallback (step 2) because
+          `service.name` was empty.
+        - `dt.service.name` is a prefixed composite like
+          `orders-api (orders-demo - OrderController)` -> Classic
+          detection residue with the Dell/UHG prefix fix applied. Both
+          signals were present; the fix combined them.
+
+    - id: 00000000-0000-0000-2101-000000000008
+      type: markdown
+      markdown: |-
+        ## Question 3: Same app, different naming
+
+        If you have two workloads running the same application - one with
+        OTEL_SERVICE_NAME set, one without - this query compares their
+        entity names side by side.
+
+        The companion demo has exactly this: `orders-sdv1` namespace with
+        `orders-demo` (no service.name) and `orders-demo-named`
+        (OTEL_SERVICE_NAME=orders-api).
+
+    - id: 00000000-0000-0000-2101-000000000009
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries cnt = sum(dt.service.request.count),
+            by: {dt.service.name, service.name, k8s.workload.name},
+            filter: matchesValue(k8s.namespace.name, "orders-sdv1"),
+            from: now()-30m
+            | fields k8s.workload.name, service.name, dt.service.name
+            | sort k8s.workload.name asc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-2101-00000000000a
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        Identical pods. Identical image. Only the presence of one
+        environment variable (`OTEL_SERVICE_NAME`) separates them.
+
+        - `orders-demo` (no service.name) -> `dt.service.name` comes
+          from the detected class-method naming.
+        - `orders-demo-named` (service.name=orders-api) -> `dt.service.name`
+          is prefixed with `orders-api (...)`, and `service.name` is
+          also queryable directly.
+
+        This is the workaround Module 2.3 walks through in detail.
+
+    - id: 00000000-0000-0000-2101-00000000000b
+      type: markdown
+      markdown: |-
+        ## What you just learned
+
+        1. Service names come from span resource attributes in a fallback
+           chain: `service.name` -> `k8s.workload.name` -> cloud fallbacks
+           -> Classic detection residue.
+        2. Everything above the last step is something you control by
+           emitting the right attribute.
+        3. In a mixed tenant you can tell *which* step produced an entity
+           name by comparing span attributes to the resulting
+           `dt.service.name`.
+
+        **Next:** [Module 2.2 - Metric-first queries](#).

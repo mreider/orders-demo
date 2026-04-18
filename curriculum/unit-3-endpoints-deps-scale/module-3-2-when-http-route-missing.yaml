@@ -1,0 +1,129 @@
+name: "Curriculum / Module 3.2 - When http.route is missing"
+type: notebook
+content:
+  defaultTimeframe:
+    from: now()-24h
+    to: now()
+  sections:
+    - id: 00000000-0000-0000-3202-000000000001
+      type: markdown
+      markdown: |-
+        # Module 3.2 - When http.route is missing
+
+        *Unit 3: Endpoints, dependencies, scale - Module 2 of 4.*
+
+        Three queries: find tenant-wide where `GET /*` dominates, confirm
+        the root cause (missing http.route), and validate the fix.
+
+    - id: 00000000-0000-0000-3202-000000000002
+      type: markdown
+      markdown: |-
+        ## Question 1: Find services with bad endpoint naming
+
+        Any service where `METHOD /*` accounts for a large share of
+        traffic is a candidate for the URL normalization fix or for
+        URL pattern matching.
+
+    - id: 00000000-0000-0000-3202-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries cnt = sum(dt.service.request.count),
+            by: {dt.service.name, endpoint.name},
+            from: now()-24h
+            | filter matches(endpoint.name, "^(GET|POST|PUT|DELETE|PATCH) /\\*$")
+            | summarize bad_cnt = sum(arraySum(cnt)),
+                by: {dt.service.name}
+            | sort bad_cnt desc
+            | limit 20
+          timeframe:
+            from: now()-24h
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-3202-000000000004
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        Services at the top of this list spend a lot of their traffic
+        hidden behind `METHOD /*`. Those are the ones to prioritize.
+
+        Zero rows is a good sign - your tenant's endpoints are already
+        cleanly named.
+
+    - id: 00000000-0000-0000-3202-000000000005
+      type: markdown
+      markdown: |-
+        ## Question 2: Confirm http.route is the root cause
+
+        Pick one service from the list above. Check whether its server
+        spans have `http.route` populated.
+
+    - id: 00000000-0000-0000-3202-000000000006
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch spans, from: now()-30m
+            | filter matchesValue(dt.service.name, "<YOUR_PROBLEM_SERVICE>")
+                AND span.kind == "server"
+            | summarize span_count = count(),
+                by: {http.route, http.request.method, endpoint.name}
+            | sort span_count desc
+            | limit 20
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-3202-000000000007
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        - `http.route` is empty on most rows -> confirmed: framework
+          isn't emitting it. This is the situation URL normalization
+          solves.
+        - `http.route` is populated but `endpoint.name` is still `/*` ->
+          a known bug fixed in Sprint 338 (APPOBS-33951). Check your
+          OneAgent version.
+        - `http.route` is populated and `endpoint.name` is clean ->
+          this service is fine. Pick a different one from Question 1.
+
+    - id: 00000000-0000-0000-3202-000000000008
+      type: markdown
+      markdown: |-
+        ## Question 3: Apply URL pattern matching (manual step)
+
+        If Question 2 confirms missing `http.route`, the production-ready
+        fix today is URL pattern matching.
+
+        1. Go to **Settings > Service detection > URL path pattern
+           matching** in your Dynatrace UI.
+        2. Add a rule for the service showing bad endpoints. Pattern
+           example: `/api/orders/{id}/items` - this names endpoints
+           that hit URLs matching this pattern.
+        3. Wait 2-3 minutes for the rule to apply.
+        4. Re-run Question 1. The problem service should have dropped
+           off the list (or at least reduced).
+
+        Once the automatic URL normalization ships for your tenant
+        (ask your CSM for the feature flag for SDv1, or toggle the
+        SDv2 checkbox if available), you can skip this manual step for
+        services where the default heuristics produce acceptable names.
+
+    - id: 00000000-0000-0000-3202-000000000009
+      type: markdown
+      markdown: |-
+        ## What you just learned
+
+        1. `METHOD /*` is a framework-coverage problem, not a Dynatrace
+           bug. ~80% of enterprise HTTP frameworks don't emit
+           `http.route`.
+        2. URL pattern matching is the supported fix today.
+        3. Automatic URL normalization ships in 2026 and covers about
+           70-75% of cases with zero configuration.
+
+        **Next:** [Module 3.3 - Downstreams are tabs, not entities](#).

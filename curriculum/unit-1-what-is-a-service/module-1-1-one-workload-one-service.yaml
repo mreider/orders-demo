@@ -1,0 +1,168 @@
+name: "Curriculum / Module 1.1 - One workload, one service"
+type: notebook
+content:
+  defaultTimeframe:
+    from: now()-30m
+    to: now()
+  sections:
+    - id: 00000000-0000-0000-1101-000000000001
+      type: markdown
+      markdown: |-
+        # Module 1.1 - One workload, one service
+
+        *Unit 1: What is a service, really? - Module 1 of 4.*
+
+        You'll run three queries in this lab. Each asks one concrete question
+        about a real workload in your tenant. Replace the placeholder values
+        in the queries with your own namespace and workload name before you
+        run them.
+
+        > **Pick a workload now.** Any Kubernetes-deployed Spring Boot, Go,
+        > Node, or Java app will do. Note the `k8s.namespace.name` and
+        > `k8s.workload.name` - you'll use them in every query.
+        >
+        > If you don't have one handy, use the `orders-demo` project's
+        > `orders-sdv1` / `orders-sdv2` namespaces (see the repo root).
+
+    - id: 00000000-0000-0000-1101-000000000002
+      type: markdown
+      markdown: |-
+        ## Question 1: How many SERVICE entities does this workload produce?
+
+        This is the foundational question. You are looking for the count of
+        distinct `dt.entity.service` IDs that have emitted data for your
+        workload in the last 30 minutes.
+
+        Replace `<YOUR_NAMESPACE>` and `<YOUR_WORKLOAD>` in the query below.
+
+    - id: 00000000-0000-0000-1101-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch spans, from: now()-30m
+            | filter matchesValue(k8s.namespace.name, "<YOUR_NAMESPACE>")
+                AND matchesValue(k8s.workload.name, "<YOUR_WORKLOAD>")
+            | summarize span_count = count(), by: {dt.entity.service}
+            | sort span_count desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1101-000000000004
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        - **1 row** - your workload is on the Latest detection model for this
+          namespace. Congratulations, the claim holds.
+        - **2-10+ rows** - your workload is on Classic, or was at some point
+          recently. Each row is a separate SERVICE entity that Dynatrace
+          treats as an independent health surface.
+
+        *If you got zero rows:* your filter matched no spans. Double-check
+        the namespace and workload names. If your workload is under heavy
+        sampling, widen `from: now()-30m` to `from: now()-4h`.
+
+    - id: 00000000-0000-0000-1101-000000000005
+      type: markdown
+      markdown: |-
+        ## Question 2: Which detection model is this namespace on?
+
+        The detection mode is a property of the namespace, configured under
+        **Settings > Service detection > Service Detection v2 for OneAgent**
+        per Kubernetes cluster. The quickest programmatic way to know which
+        mode is active is to look for the SDv2 `UNIFIED` service type.
+
+    - id: 00000000-0000-0000-1101-000000000006
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch dt.entity.service
+            | filter contains(entity.name, "<YOUR_WORKLOAD>")
+            | fields id, entity.name, serviceType
+            | sort entity.name asc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1101-000000000007
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        - `serviceType = UNIFIED` - this workload is detected by the Latest
+          model. You'll see exactly one row, named either from your
+          `service.name` resource attribute or from `k8s.workload.name`.
+        - `serviceType = WEB_REQUEST_SERVICE` alongside several `WEB_SERVICE`
+          and sometimes `MESSAGING_SERVICE` or `DATABASE_SERVICE` - this
+          workload is detected by Classic. Each row is a separate entity.
+
+        Mixed? You're in transition. Latest detection creates new UNIFIED
+        entities going forward but doesn't retire the Classic ones; both
+        may carry data for the same workload until the Classic entities
+        stop receiving spans.
+
+    - id: 00000000-0000-0000-1101-000000000008
+      type: markdown
+      markdown: |-
+        ## Question 3: What does each entity represent?
+
+        If Question 2 returned multiple rows, the entity names tell you how
+        Classic sliced the workload. This final query pulls recent activity
+        per entity so you can see each one as a live health surface.
+
+    - id: 00000000-0000-0000-1101-000000000009
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries request_rate = sum(dt.service.request.count),
+            by: {dt.entity.service},
+            from: now()-30m
+            | lookup [fetch dt.entity.service | fields id, entity.name, serviceType],
+                sourceField: dt.entity.service, lookupField: id, prefix: "svc."
+            | filter contains(svc.entity.name, "<YOUR_WORKLOAD>")
+            | fields svc.entity.name, svc.serviceType, request_rate
+            | sort svc.serviceType asc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1101-00000000000a
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        Under Latest you see one series. Under Classic you see four or more.
+        The names are your workload's internal structure exposed as separate
+        entities: controllers become WEB_SERVICE rows, Kafka listeners
+        become MESSAGING_SERVICE rows, database clients become
+        DATABASE_SERVICE rows.
+
+        Notice the query's shape: we had to `lookup` the entity table to
+        resolve IDs to names. That's the query tax of the entity-first
+        model. Module 2.2 shows how Latest removes this tax entirely.
+
+    - id: 00000000-0000-0000-1101-00000000000b
+      type: markdown
+      markdown: |-
+        ## What you just learned
+
+        1. The same Kubernetes workload can show up as 1 entity or as 4-10
+           entities, depending on which detection model the namespace is on.
+        2. The Latest detection model collapses fragmentation. One workload,
+           one entity.
+        3. Classic's fragmentation isn't a bug - it's how services were
+           modeled in 2011 (one process = one service). It doesn't match how
+           teams deploy today.
+
+        The rest of Unit 1 builds on this: transport families (1.2),
+        attribute-as-slicing (1.3), and a direct side-by-side of the two
+        models (1.4).
+
+        **Next:** [Module 1.2 - The three transport families](#).

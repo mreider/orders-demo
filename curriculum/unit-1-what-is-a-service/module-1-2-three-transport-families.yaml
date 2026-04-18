@@ -1,0 +1,172 @@
+name: "Curriculum / Module 1.2 - The three transport families"
+type: notebook
+content:
+  defaultTimeframe:
+    from: now()-30m
+    to: now()
+  sections:
+    - id: 00000000-0000-0000-1102-000000000001
+      type: markdown
+      markdown: |-
+        # Module 1.2 - The three transport families
+
+        *Unit 1: What is a service, really? - Module 2 of 4.*
+
+        Pick a workload. The queries below show exactly what kinds of
+        activity it emits, and how the three metric families map to what
+        the Services app shows you.
+
+        > **Replace the placeholders** in each query:
+        > - `<YOUR_NAMESPACE>` - the k8s.namespace.name
+        > - `<YOUR_WORKLOAD>` - the k8s.workload.name
+        >
+        > If you're using the companion demo, try `orders-sdv1` + `orders-demo`
+        > to see a service with both HTTP and messaging activity.
+
+    - id: 00000000-0000-0000-1102-000000000002
+      type: markdown
+      markdown: |-
+        ## Question 1: Which families does this workload emit?
+
+        The simplest family check: sum each of the three metric families
+        for the same workload. Any family with counts > 0 is active.
+
+    - id: 00000000-0000-0000-1102-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries {
+              http_requests    = sum(dt.service.request.count),
+              messages_process = sum(dt.service.messaging.process.count),
+              faas_invocations = sum(dt.service.faas_invoke.count)
+            },
+            by: {k8s.workload.name, k8s.namespace.name},
+            filter: matchesValue(k8s.namespace.name, "<YOUR_NAMESPACE>")
+                AND matchesValue(k8s.workload.name, "<YOUR_WORKLOAD>"),
+            from: now()-30m
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1102-000000000004
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        - Only `http_requests` has counts -> classic HTTP service (REST API,
+          web frontend).
+        - `http_requests` + `messages_process` both have counts -> service
+          that handles web traffic and consumes from a queue.
+        - `faas_invocations` has counts -> Lambda / Azure Function / Cloud
+          Function. May also have HTTP counts if behind API Gateway.
+        - All three zero -> double-check your filter (or the workload is
+          idle). `fetch spans | filter ...` will confirm traffic.
+
+    - id: 00000000-0000-0000-1102-000000000005
+      type: markdown
+      markdown: |-
+        ## Question 2: What dimensions make each family queryable?
+
+        Each family carries dimensions that make sense for its kind of
+        activity. This query shows throughput split by the most common
+        dimension per family. Rows are endpoints for the HTTP family,
+        destinations for messaging.
+
+    - id: 00000000-0000-0000-1102-000000000006
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries http = sum(dt.service.request.count),
+            by: {endpoint.name, k8s.workload.name},
+            filter: matchesValue(k8s.workload.name, "<YOUR_WORKLOAD>"),
+            from: now()-30m
+            | filter endpoint.name != ""
+            | sort arraySum(http) desc
+            | limit 10
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1102-000000000007
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries msg = sum(dt.service.messaging.process.count),
+            by: {messaging.destination.name, messaging.system, k8s.workload.name},
+            filter: matchesValue(k8s.workload.name, "<YOUR_WORKLOAD>"),
+            from: now()-30m
+            | filter messaging.destination.name != ""
+            | sort arraySum(msg) desc
+            | limit 10
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1102-000000000008
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        Each family has its natural palette of dimensions. You don't have
+        to pick one dimension at detection time (like Classic did when it
+        made one WEB_SERVICE entity per controller class). You pick the
+        dimension at query time, depending on the question you're asking.
+
+        This is what "attribute-first" means in practice: the cut is in
+        the DQL, not in the entity graph.
+
+    - id: 00000000-0000-0000-1102-000000000009
+      type: markdown
+      markdown: |-
+        ## Question 3: Coalesce - the "Transactions" view
+
+        This is the query the Services app runs for the Transactions
+        column: add all three families together into one count.
+
+    - id: 00000000-0000-0000-1102-00000000000a
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries transactions = sum(dt.service.request.count)
+                                    + sum(dt.service.messaging.process.count)
+                                    + sum(dt.service.faas_invoke.count),
+            by: {k8s.workload.name},
+            filter: matchesValue(k8s.workload.name, "<YOUR_WORKLOAD>"),
+            from: now()-30m
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1102-00000000000b
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        One line. One workload. One coalesced rate that matches the
+        "Transactions" column in the Services app. Under the hood it's
+        three families; at the UI level it's one number.
+
+    - id: 00000000-0000-0000-1102-00000000000c
+      type: markdown
+      markdown: |-
+        ## What you just learned
+
+        1. Three metric families carry service activity: HTTP, messaging,
+           FaaS.
+        2. Each family has its own native set of dimensions.
+        3. The Services app's "Transactions" number is the coalesced
+           total across all three families.
+
+        Module 1.3 shows what happens when you split those counts by
+        dimension values - and how Classic would have done the same thing
+        by creating separate entities instead.
+
+        **Next:** [Module 1.3 - Dimensions, not entities, split the view](#).

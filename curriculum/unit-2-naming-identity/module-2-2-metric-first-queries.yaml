@@ -1,0 +1,224 @@
+name: "Curriculum / Module 2.2 - Metric-first queries"
+type: notebook
+content:
+  defaultTimeframe:
+    from: now()-30m
+    to: now()
+  sections:
+    - id: 00000000-0000-0000-2202-000000000001
+      type: markdown
+      markdown: |-
+        # Module 2.2 - Metric-first queries
+
+        *Unit 2: Naming and identity - Module 2 of 4.*
+
+        Each pair below answers the same question two ways. Run both.
+        Open the query metadata panel (bottom of each cell) and compare
+        `Scanned records` - that's the cost difference.
+
+        Replace `<YOUR_SERVICE_NAME>` with the dt.service.name value
+        for a service in your tenant (you can find one by running
+        `timeseries by: {dt.service.name}, filter: ..., from: now()-5m`
+        against any workload).
+
+    - id: 00000000-0000-0000-2202-000000000002
+      type: markdown
+      markdown: |-
+        ## Comparison 1: List endpoints of a service
+
+        ### Entity-joined (longer)
+
+    - id: 00000000-0000-0000-2202-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries cnt = sum(dt.service.request.count),
+            by: {dt.entity.service, endpoint.name},
+            from: now()-30m
+            | lookup [fetch dt.entity.service | fields id, entity.name],
+                sourceField: dt.entity.service, lookupField: id, prefix: "svc."
+            | filter svc.entity.name == "<YOUR_SERVICE_NAME>"
+            | fields endpoint.name, cnt
+            | sort arraySum(cnt) desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-2202-000000000004
+      type: markdown
+      markdown: |-
+        ### Metric-first (shorter)
+
+    - id: 00000000-0000-0000-2202-000000000005
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries cnt = sum(dt.service.request.count),
+            by: {endpoint.name},
+            filter: matchesValue(dt.service.name, "<YOUR_SERVICE_NAME>"),
+            from: now()-30m
+            | sort arraySum(cnt) desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-2202-000000000006
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        Same rows, same counts. The metric-first version has no `lookup`,
+        no `svc.*` fields, one filter instead of two. Check the query
+        metadata at the bottom of each cell - Scanned records on the
+        metric-first version is typically lower.
+
+    - id: 00000000-0000-0000-2202-000000000007
+      type: markdown
+      markdown: |-
+        ## Comparison 2: Average response time for one endpoint
+
+        ### Entity-joined
+
+    - id: 00000000-0000-0000-2202-000000000008
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries rt = avg(dt.service.request.response_time),
+            by: {dt.entity.service, endpoint.name},
+            from: now()-30m
+            | lookup [fetch dt.entity.service | fields id, entity.name],
+                sourceField: dt.entity.service, lookupField: id, prefix: "svc."
+            | filter svc.entity.name == "<YOUR_SERVICE_NAME>"
+                AND endpoint.name == "<YOUR_ENDPOINT_NAME>"
+            | fields rt
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-2202-000000000009
+      type: markdown
+      markdown: |-
+        ### Metric-first
+
+    - id: 00000000-0000-0000-2202-00000000000a
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries rt = avg(dt.service.request.response_time),
+            filter: matchesValue(dt.service.name, "<YOUR_SERVICE_NAME>")
+                AND matchesValue(endpoint.name, "<YOUR_ENDPOINT_NAME>"),
+            from: now()-30m
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-2202-00000000000b
+      type: markdown
+      markdown: |-
+        ## Comparison 3: Failure rate split by HTTP status
+
+        ### Entity-joined
+
+    - id: 00000000-0000-0000-2202-00000000000c
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries failures = sum(dt.service.request.failure_count),
+            by: {dt.entity.service, http.response.status_code},
+            from: now()-30m
+            | lookup [fetch dt.entity.service | fields id, entity.name],
+                sourceField: dt.entity.service, lookupField: id, prefix: "svc."
+            | filter svc.entity.name == "<YOUR_SERVICE_NAME>"
+            | fields http.response.status_code, failures
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: barChart
+
+    - id: 00000000-0000-0000-2202-00000000000d
+      type: markdown
+      markdown: |-
+        ### Metric-first
+
+    - id: 00000000-0000-0000-2202-00000000000e
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries failures = sum(dt.service.request.failure_count),
+            by: {http.response.status_code},
+            filter: matchesValue(dt.service.name, "<YOUR_SERVICE_NAME>"),
+            from: now()-30m
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: barChart
+
+    - id: 00000000-0000-0000-2202-00000000000f
+      type: markdown
+      markdown: |-
+        ## Comparison 4: Workload total across three families
+
+        ### Entity-joined
+
+    - id: 00000000-0000-0000-2202-000000000010
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries t = sum(dt.service.request.count)
+                         + sum(dt.service.messaging.process.count)
+                         + sum(dt.service.faas_invoke.count),
+            by: {dt.entity.service},
+            from: now()-30m
+            | lookup [fetch dt.entity.service | fields id, entity.name, serviceType],
+                sourceField: dt.entity.service, lookupField: id, prefix: "svc."
+            | filter svc.entity.name == "<YOUR_SERVICE_NAME>"
+                AND svc.serviceType in array("UNIFIED", "WEB_REQUEST_SERVICE")
+            | fields t
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-2202-000000000011
+      type: markdown
+      markdown: |-
+        ### Metric-first
+
+    - id: 00000000-0000-0000-2202-000000000012
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries t = sum(dt.service.request.count)
+                         + sum(dt.service.messaging.process.count)
+                         + sum(dt.service.faas_invoke.count),
+            filter: matchesValue(dt.service.name, "<YOUR_SERVICE_NAME>"),
+            from: now()-30m
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-2202-000000000013
+      type: markdown
+      markdown: |-
+        ## What you just learned
+
+        1. `dt.service.name` and `service.name` are queryable metric
+           dimensions, not just entity display names.
+        2. Metric-first DQL is shorter, cheaper, and easier to read.
+        3. The entity table is for *entity metadata* (ownership, tags,
+           description). Prefer metric dimensions for most questions.
+
+        **Next:** [Module 2.3 - The service.name workaround](#).

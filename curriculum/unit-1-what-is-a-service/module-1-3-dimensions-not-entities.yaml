@@ -1,0 +1,151 @@
+name: "Curriculum / Module 1.3 - Dimensions, not entities, split the view"
+type: notebook
+content:
+  defaultTimeframe:
+    from: now()-30m
+    to: now()
+  sections:
+    - id: 00000000-0000-0000-1103-000000000001
+      type: markdown
+      markdown: |-
+        # Module 1.3 - Dimensions, not entities, split the view
+
+        *Unit 1: What is a service, really? - Module 3 of 4.*
+
+        Three queries answer the same question - "which endpoint is hottest?" -
+        three ways. You'll need two workloads for this lab: one under Classic
+        SDv1 detection, one under Latest SDv2. The companion demo supplies both:
+        - SDv1 side: namespace `orders-sdv1`, workload `orders-demo`
+        - SDv2 side: namespace `orders-sdv2`, workload `orders-demo`
+
+        If your own tenant has both, substitute your own values.
+
+    - id: 00000000-0000-0000-1103-000000000002
+      type: markdown
+      markdown: |-
+        ## Question 1: Classic style - one entity per endpoint-group
+
+        Under Classic detection, each controller class becomes its own
+        WEB_SERVICE entity. This query groups at the entity level.
+
+    - id: 00000000-0000-0000-1103-000000000003
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries rt = avg(dt.service.request.response_time),
+            by: {dt.entity.service},
+            filter: in(dt.entity.service,
+                       classicOf(entitySelector: "type(SERVICE),fromRelationships.isInstanceOf(type(SERVICE_GROUP),entityName.in(\"orders-demo\"))")),
+            from: now()-30m
+            | lookup [fetch dt.entity.service | fields id, entity.name, serviceType],
+                sourceField: dt.entity.service, lookupField: id, prefix: "svc."
+            | filter svc.serviceType == "WEB_SERVICE"
+            | fields svc.entity.name, rt
+            | sort arraySum(rt) desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1103-000000000004
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        Under Classic, each row is a *different entity*. To get named rows
+        you lookup against the entity table. If your tenant is fully on
+        Latest and doesn't have WEB_SERVICE entities, this query will be
+        empty - that's fine, skip to Question 2.
+
+        **If this query feels awkward:** that's the point. Entity-first
+        slicing forces you to route through the entity graph even for
+        questions that are fundamentally about dimensions.
+
+    - id: 00000000-0000-0000-1103-000000000005
+      type: markdown
+      markdown: |-
+        ## Question 2: Latest style - one entity, group by endpoint.name
+
+        Same question, Latest model. Instead of grouping by entity, you
+        group by the endpoint.name dimension on metrics from the single
+        UNIFIED service.
+
+    - id: 00000000-0000-0000-1103-000000000006
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries rt = avg(dt.service.request.response_time),
+            by: {endpoint.name},
+            filter: matchesValue(dt.service.name, "<YOUR_SDV2_SERVICE_NAME>"),
+            from: now()-30m
+            | filter endpoint.name != ""
+            | sort arraySum(rt) desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1103-000000000007
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        One filter, one group-by, one line per endpoint. No entity
+        lookup, no service-type filtering, no extra pipeline steps.
+
+        If you're using the demo, `<YOUR_SDV2_SERVICE_NAME>` is
+        `orders-sdv2 -- orders-demo`. In your own tenant, it's whatever
+        the Services app shows as the service name for your UNIFIED
+        entity.
+
+    - id: 00000000-0000-0000-1103-000000000008
+      type: markdown
+      markdown: |-
+        ## Question 3: Same mechanism, different family
+
+        The attribute-first pattern generalises. Swap `dt.service.request.*`
+        for `dt.service.messaging.process.*` and `endpoint.name` for
+        `messaging.destination.name` - the shape is identical.
+
+    - id: 00000000-0000-0000-1103-000000000009
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries dur = avg(dt.service.messaging.process.duration),
+            by: {messaging.destination.name},
+            filter: matchesValue(dt.service.name, "<YOUR_SDV2_SERVICE_NAME>"),
+            from: now()-30m
+            | filter messaging.destination.name != ""
+            | sort arraySum(dur) desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1103-00000000000a
+      type: markdown
+      markdown: |-
+        **Read the result:**
+
+        Same service entity. Different metric family. Different dimension.
+        Same DQL shape. The mechanism is uniform.
+
+    - id: 00000000-0000-0000-1103-00000000000b
+      type: markdown
+      markdown: |-
+        ## What you just learned
+
+        1. "Per-controller" / "per-destination" used to mean "per-entity"
+           in Classic. In Latest, it means "per-dimension-value."
+        2. The DQL shape for dimension splits is the same regardless of
+           transport family - swap the metric, swap the dimension.
+        3. There is no entity-graph round-trip in Latest. The slice is
+           in the query.
+
+        Unit 1 closes with Module 1.4, where you see the two models
+        side by side on identical application code.
+
+        **Next:** [Module 1.4 - Classic vs Latest, side by side](#).

@@ -1,9 +1,7 @@
-target/
-*.class
-*.jar
-.idea/
-.vscode/
-*.iml
-.DS_Store
-.env
-*.log
+node_modules/
+package.json
+package-lock.json
+scripts/capture.js
+bin/
+exports/
+*.pptx

@@ -1,0 +1,76 @@
+# Second workload in the orders-sdv1 namespace, identical image + config
+# to orders-demo, but with OTEL_SERVICE_NAME set. This exists to teach the
+# service.name story (Curriculum Module 2.3): two otherwise-identical
+# workloads side-by-side, one with a resource attribute that overrides the
+# fallback naming and one without.
+#
+# The learner sees the effect in three places:
+#   1. Entity display name   - "orders-api (orders-demo-named)" vs "orders-demo"
+#      (the "orders-api" prefix comes from the detection-layer fix shipped for
+#       Dell/UHG on 2026-03-05 when service.name is set as a resource attribute)
+#   2. Metric dimension      - service.name == "orders-api" on dt.service.*
+#   3. Query ergonomics      - filter: service.name == "orders-api" works,
+#                              no entity-table lookup needed
+#
+# Both OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES are set - OneAgent and
+# the OTel autoinstrumentation that ships with it both respect these env vars
+# when the app emits traces through the OTel pipeline.
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-demo-named
+  namespace: orders-sdv1
+spec:
+  selector:
+    app: orders-demo-named
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-demo-named
+  namespace: orders-sdv1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: orders-demo-named
+  template:
+    metadata:
+      labels:
+        app: orders-demo-named
+    spec:
+      containers:
+        - name: orders-demo-named
+          image: ${ORDERS_IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "orders-api"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name=orders-api,service.namespace=orders"
+            - name: DB_URL
+              value: jdbc:postgresql://postgres:5432/orders
+            - name: DB_USER
+              value: orders
+            - name: DB_PASSWORD
+              value: orders
+            - name: KAFKA_BOOTSTRAP
+              value: redpanda:9092
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms256m -Xmx512m"
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "200m", memory: "512Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }
