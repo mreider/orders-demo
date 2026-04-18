@@ -18,21 +18,27 @@ The Services app's **Transactions** column is the coalesced sum across all three
 
 Kafka consume activity currently **double-counts**: it shows up in both `dt.service.request.*` and `dt.service.messaging.process.*`. On the SDv1 fragment `OrderEventsListener`, `dt.service.request.count` reports ~240/min with `endpoint.name = NON_KEY_REQUESTS` — a Classic artifact from before dedicated messaging families existed. Same numbers under `dt.service.messaging.process.count` for the same destination.
 
-Don't build alerts on the sum of families until this lands. The overlap goes away when **SDv2 for OneAgent GAs in June 2026** — `dt.service.request.*` will be HTTP-only and messaging activity will live exclusively under `dt.service.messaging.process.*`.
+Don't build alerts on the sum of families until this lands. The overlap goes away in a future SDv2-for-OneAgent release — `dt.service.request.*` will be HTTP-only and messaging activity will live exclusively under `dt.service.messaging.process.*`.
 
-## Downstreams are tabs, not entities
+## Downstreams are tabs on the caller — but the destination is the real entity
 
-Databases, queues, and third-party HTTP don't get their own Services rows. They surface as tabs on the **caller**:
+On both SDv1 and SDv2, the calling service is the anchor. Databases, queues, and third-party HTTP surface as tabs on the caller:
 
-| Tab | Metric family | Dimensions |
+| Tab | Metric family (target state) | Dimensions |
 |---|---|---|
-| **DB Queries** | `dt.service.database.query.*` | `db.system.name`, `db.operation.name`, `server.address` |
-| **Message Processing** | `dt.service.messaging.process.*` (consume + publish) | `messaging.destination.name`, `messaging.system` |
+| **DB Queries** | `dt.service.database.*` | `db.system`, `db.operation.name`, `server.address` |
+| **Message Processing** | `dt.service.messaging.process.*` | `messaging.destination.name`, `messaging.system` |
 | **Outbound Calls** | `dt.service.thirdparty.*` + client spans | host, endpoint, status |
 
-Database identity lives on the JDBC client span owned by the calling service. The tab UI is a curated view of those dimensions. This applies on both SDv1 and SDv2 — it's a Latest-app feature, not an SDv2-only feature.
+What changes under SDv2 is what the numbers **measure**.
 
-If you're coming from Classic, the separate `DATABASE_SERVICE` / `MESSAGING_SERVICE` / `EXTERNAL_SERVICE` entities are gone. *"Where are my queue listeners?"* is now a Message Processing tab on the caller. Relocation, not removal.
+**SDv1 measures the client-side call and labels it the database.** The "database service" in a Classic path is the calling app's JDBC span — its latency is the round-trip as seen *from the caller*. Alerts and baselines fire on the client's view of the DB, not on the DB itself. For a multi-tenant Postgres instance, every caller gets a different DATABASE_SERVICE entity with different latency, and none of them reflect what's happening inside Postgres.
+
+**SDv2 targets the real DB entity as the owner of the measurement.** A Postgres extension running on an ActiveGate produces a real `dt.entity.postgresql_instance` with connection count, WAL, replication lag, and query rate sampled at the database. When the span-to-entity linking for databases ships in a future SDv2-for-OneAgent release, the `dt.service.database.*` metric written on the calling service will also link to that real DB entity — so query latency, error rate, and alert ownership roll up to the database itself, not to whichever caller happened to notice slowness first.
+
+Same shape for messaging: the real broker (Kafka cluster, SQS queue) is the destination, and message processing metrics should eventually point at it rather than live as a dimension on whichever consumer noticed the lag. The messaging side of that linking is less mature than the DB side today — the broker-as-owner story for messaging is further out.
+
+If you're coming from Classic, the separate `DATABASE_SERVICE` / `MESSAGING_SERVICE` / `EXTERNAL_SERVICE` entities are gone as client-side constructs. Their replacement isn't another client-side surrogate — it's the actual infrastructure entity produced by an extension, with the calling service's metric pointing to it.
 
 ## `endpoint.name` and the `GET /*` reality
 
@@ -71,6 +77,8 @@ Shorter, cheaper, and stable across entity re-detection — dimension values don
 - **`SERVICE_DEPLOYMENT`** is a planned entity type orthogonal to SERVICE, carrying deployment context (namespace, cluster, environment, version, release stage). One SERVICE, many SERVICE_DEPLOYMENTs linked by `dt.service.id`. Lets you answer *"staging error rate, independent of prod"* without splitting identity. Maps directly onto Datadog's `service` + `env` + `version` pattern.
 - **Primary Fields as metric dimensions.** `k8s.cluster.name`, `k8s.namespace.name`, and configurable tags become first-class on the service metric families, so you can filter and split without a `lookup`.
 - **Services app rewire to timeseries-first.** List and detail pages move from entity-list-plus-chart to query-led: pick metric families, split by dimensions, filter on tags.
+- **`dt.service.database.*` metric family, linked to the real DB entity.** A telemetry-based topology pipeline that matches database client spans to the real DB entity produced by a DB extension, then writes a service-level DB metric split by the usual service dimensions. Landing in a future SDv2-for-OneAgent release. The client spans are already shaped correctly today (`db.system="postgresql"`, `server.address=postgres`, `db.operation.name`) — nothing to change on the instrumentation side.
+- **Messaging-to-broker linking** follows a similar vision but is less mature. Today's `dt.service.messaging.process.*` lives on the consuming service dimensioned by destination; the broker-as-owner destination is further out.
 
 ## What to do today
 

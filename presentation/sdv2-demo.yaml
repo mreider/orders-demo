@@ -20,7 +20,7 @@ content:
 
         **Part 1 — One workload, one service** (questions 1-4): how SDv2 collapses the `dt.service.name` and `dt.entity.service` fragmentation that SDv1 produces, and how `OTEL_SERVICE_NAME` acts as a prefix on every SDv1 fragment. [Narrative on GitHub.](https://github.com/mreider/orders-demo/blob/main/presentation/01-one-workload-one-service.md)
 
-        **Part 2 — Dimensions do the slicing** (questions 5-10): metric families, the legacy `request.*`-for-messaging overlap that goes away at SDv2-OneAgent GA, `endpoint.name`, downstreams as dimensions on the caller, and metric-first DQL. [Narrative on GitHub.](https://github.com/mreider/orders-demo/blob/main/presentation/02-dimensions-do-the-slicing.md)
+        **Part 2 — Dimensions do the slicing** (questions 5-10, plus 9b): metric families, the legacy `request.*`-for-messaging overlap that goes away in a future SDv2-for-OneAgent release, `endpoint.name`, downstreams as dimensions on the caller, metric-first DQL, and a side-by-side of the "fake" SDv1 DB service (measured on the caller) vs the real source-side Postgres metrics that will own health once database topology linking lands. [Narrative on GitHub.](https://github.com/mreider/orders-demo/blob/main/presentation/02-dimensions-do-the-slicing.md)
 
         Demo tenant uses `orders-sdv1` / `orders-sdv2` namespaces with workload `orders-demo` (plus `orders-demo-named` in sdv1 for the prefix comparison). Replace with your own namespace/workload to run against your tenant.
 
@@ -255,7 +255,7 @@ content:
       markdown: |-
         ## Question 6: Where does the legacy `request.*`-for-messaging overlap show up?
 
-        Kafka consume activity currently double-counts: it shows up in both `dt.service.request.*` (a legacy behavior from before dedicated messaging families existed) and `dt.service.messaging.process.*` (the modern home). Goes away when SDv2 for OneAgent GAs in **June 2026** — `request.*` will then be HTTP-only.
+        Kafka consume activity currently double-counts: it shows up in both `dt.service.request.*` (a legacy behavior from before dedicated messaging families existed) and `dt.service.messaging.process.*` (the modern home). Goes away **in a future SDv2-for-OneAgent release** — `request.*` will then be HTTP-only.
 
     - id: 00000000-0000-0000-1102-000000000021
       type: dql
@@ -277,7 +277,7 @@ content:
     - id: 00000000-0000-0000-1102-000000000022
       type: markdown
       markdown: |-
-        Read: both series track each other at the same rate. Same Kafka consumes, counted twice under two families. On `request.*` the `endpoint.name` shows as `NON_KEY_REQUESTS` — a Classic artifact visible nowhere else. Don't sum families in alerts until SDv2-for-OA GA.
+        Read: both series track each other at the same rate. Same Kafka consumes, counted twice under two families. On `request.*` the `endpoint.name` shows as `NON_KEY_REQUESTS` — a Classic artifact visible nowhere else. Don't sum families in alerts until the overlap clears in a future SDv2-for-OneAgent release.
 
     - id: 00000000-0000-0000-1102-000000000005
       type: markdown
@@ -310,9 +310,11 @@ content:
     - id: 00000000-0000-0000-1102-000000000008
       type: markdown
       markdown: |-
-        ## Question 8: Messaging as a dimension, not an entity.
+        ## Question 8: Messaging — a dimension today, a broker entity tomorrow.
 
-        The Kafka consumer doesn't get its own service row under SDv2. It's a `messaging.process.*` metric on the caller, split by `messaging.destination.name`.
+        Under SDv2 the Kafka consumer doesn't get its own service row — it's `dt.service.messaging.process.*` on the consuming service, split by `messaging.destination.name`.
+
+        The broader vision mirrors DB: the real message broker (Kafka cluster, SQS queue) becomes the destination the metric links to, so queue depth, consumer lag, and alert ownership live on the broker — not on whichever consumer happened to notice lag first. That span-to-broker linking is less mature than the database equivalent; the broker-as-owner story for messaging is further out.
 
     - id: 00000000-0000-0000-1102-000000000009
       type: dql
@@ -338,9 +340,13 @@ content:
     - id: 00000000-0000-0000-1102-00000000000b
       type: markdown
       markdown: |-
-        ## Question 9: Downstream DB calls as dimensions on the caller.
+        ## Question 9: Downstream DB calls — today and where they're going.
 
-        JDBC calls don't get their own entity. They're client spans on the calling service, dimensioned by `server.address` / `db.operation.name`.
+        SDv1 measures the client-side JDBC call and labels it the database. The "database service" latency in Classic is the round trip as seen from `orders-demo` — not what's actually happening inside Postgres.
+
+        SDv2's target: `dt.service.database.*` metric written on the calling service, with the linking target being the **real DB entity** produced by a Postgres extension. Query latency, error rate, and alert ownership then roll up to the database itself.
+
+        On this tenant the span data is already shaped correctly — `db.system="postgresql"`, `server.address=postgres`, plus `db.operation.name`. A telemetry-based topology pipeline that extracts those spans, matches them to the real DB entity (from a DB extension), and writes a service-level DB metric is actively in development. Landing in a future SDv2-for-OneAgent release; span instrumentation already matches what it expects.
 
     - id: 00000000-0000-0000-1102-00000000000c
       type: dql
@@ -351,7 +357,7 @@ content:
             | filter matchesValue(k8s.namespace.name, "orders-sdv2")
                 AND matchesValue(k8s.workload.name, "orders-demo")
                 AND span.kind == "client"
-            | summarize span_count = count(), by: {server.address, db.operation.name, db.system.name}
+            | summarize span_count = count(), by: {server.address, db.operation.name, db.system}
             | sort span_count desc
           timeframe:
             from: now()-30m
@@ -361,7 +367,149 @@ content:
     - id: 00000000-0000-0000-1102-00000000000d
       type: markdown
       markdown: |-
-        Read: client spans to `postgres` on port 5432 with `db.operation.name` values (SELECT, INSERT, UPDATE). Under Classic this would have been a separate `DATABASE_SERVICE` entity; here it's a facet of the calling service.
+        Read: client spans to `postgres` on port 5432 with `db.operation.name` values (SELECT, INSERT, UPDATE, PREPARE) and `db.system=postgresql` — the attributes the future `dt.service.database.*` extractor will key off of. Until that chain ships, these stay as span-level facts on the caller rather than a metric family; `dt.service.database.*` does not populate on this tenant yet.
+
+    - id: 00000000-0000-0000-1102-000000000020
+      type: markdown
+      markdown: |-
+        ## Question 9b: Source truth vs client view — the "fake database service" story.
+
+        Under SDv1 (and in the Classic services UI) a DATABASE_SERVICE entity appeared with its own latency, throughput, and alerts. That entity's numbers came entirely from the **caller's JDBC span** — what `orders-demo` saw when it issued the query. It was never the database's own view of itself.
+
+        Two problems that flow from this:
+
+        1. **Latency is network + server processing + serialization**, all bundled, measured on the caller. A slow run could be Postgres under load, a clogged pod network, or the driver doing TLS. You can't tell which from the "DB service" row alone.
+        2. **Every caller gets its own version.** Multi-tenant Postgres? Ten services → ten DATABASE_SERVICE entities, ten different baselines, all talking about the same actual database.
+
+        Side-by-side below: the client's view (what orders-demo measures) vs. what the real Postgres emits once a Dynatrace PostgreSQL extension is running. Automatic linking from those client spans to the real DB entity is in development and lands in a future SDv2-for-OneAgent release.
+
+    - id: 00000000-0000-0000-1102-000000000021
+      type: markdown
+      markdown: |-
+        **Client-side view (today — "fake" DB service perspective).** Span counts dimensioned by DB operation — this is what SDv1 turns into the DATABASE_SERVICE health numbers.
+
+    - id: 00000000-0000-0000-1102-000000000022
+      type: dql
+      state:
+        input:
+          value: |-
+            fetch spans, from: now()-30m
+            | filter matchesValue(k8s.namespace.name, "orders-sdv2")
+                AND matchesValue(k8s.workload.name, "orders-demo")
+                AND span.kind == "client"
+                AND server.address == "postgres"
+            | summarize
+                calls = count(),
+                p50_ms = percentile(toDouble(duration) / 1000000, 50),
+                p95_ms = percentile(toDouble(duration) / 1000000, 95),
+                by: {db.operation.name}
+            | sort calls desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: table
+
+    - id: 00000000-0000-0000-1102-000000000023
+      type: markdown
+      markdown: |-
+        **Source-side view (metrics FROM Postgres).** The Dynatrace `com.dynatrace.extension.otel-postgres` Hub extension scrapes a `postgres-exporter` Deployment in each namespace and the extension's built-in OTel Collector pipeline renames the Prometheus keys (`pg_stat_database_*` → `postgres.*`, `pg_stat_bgwriter_*` → `postgres.checkpoints_*`, etc.). These numbers come from Postgres itself — transactions, deadlocks, buffer hit/read activity — not from the caller's JDBC span.
+
+        Alerts on `postgres.deadlocks` or `postgres.blk_read_time` fire on the database regardless of which service noticed the symptom. Multiple callers converge on one Postgres instance, one baseline, one problem.
+
+        *(Note: on this tenant the extension pipeline consolidates both postgres-exporter sources into a single series — dimensions like `k8s.namespace.name` are stripped by the extension's managed OTel transform. `dt.metrics.source = "com.dynatrace.extension.otel-postgres"` is the only surviving dimension. For this demo the totals are clustered; in production you'd typically split by DB entity once the topology link ships.)*
+
+    - id: 00000000-0000-0000-1102-000000000024
+      type: dql
+      state:
+        input:
+          value: |-
+            // Transactions, deadlocks, cache hits — straight from Postgres via postgres-exporter + otel-postgres extension
+            timeseries {
+                connections = avg(postgres.num_backends),
+                commits     = sum(postgres.xact_commit),
+                rollbacks   = sum(postgres.xact_rollback),
+                deadlocks   = sum(postgres.deadlocks),
+                blks_hit    = sum(postgres.blks_hit),
+                blks_read   = sum(postgres.blks_read)
+              },
+              from: now()-30m
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1102-000000000026
+      type: markdown
+      markdown: |-
+        Side-by-side interpretation:
+        - **Client view (above)** counts every SELECT/INSERT/UPDATE the app *attempted*. Latency includes the network hop, the driver, the server's processing, and serialization. A spike here could come from any layer.
+        - **Source view (just now)** shows what Postgres actually did — commits, rollbacks, deadlocks, cache hits per database. If `postgres.deadlocks` is rising while client INSERTs show high latency, that's server-side contention. If cache-hit ratio (`blks_hit / (blks_hit + blks_read)`) drops, you're reading cold. These diagnostics don't exist in the client-side view.
+
+    - id: 00000000-0000-0000-1102-000000000027
+      type: markdown
+      markdown: |-
+        ## Question 9c: Same story for Kafka — client view vs broker view.
+
+        The SDv1-era `OrderEventsListener` service (from Question 1) is the messaging equivalent of the "fake database service": its health is what the **consumer** observed, not the broker's own view. SDv2 folds the consumer back onto the parent service as a `dt.service.messaging.process.*` dimension — but that's still a client-side measurement.
+
+        The missing piece is the broker-side view: queue depth, partition distribution, consumer lag, request latency as the **broker** reports them. OneAgent's built-in Kafka sensor auto-detects Apache Kafka broker JVMs and emits `kafka.*` metrics directly — no extension config needed, just install a real Kafka (which this demo now does — `k8s/20-kafka.yaml` replaced the earlier Redpanda since Redpanda is C++ and doesn't expose JMX for OneAgent to introspect).
+
+    - id: 00000000-0000-0000-1102-000000000028
+      type: markdown
+      markdown: |-
+        **Client view (consumer perspective).** `dt.service.messaging.process.count` for the `orders-demo` SDv2 service, split by destination. This is what SDv1 turns into the `OrderEventsListener` service health numbers.
+
+    - id: 00000000-0000-0000-1102-000000000029
+      type: dql
+      state:
+        input:
+          value: |-
+            timeseries msg = sum(dt.service.messaging.process.count),
+              by: {messaging.destination.name, messaging.system},
+              filter: matchesValue(k8s.namespace.name, "orders-sdv2") AND matchesValue(k8s.workload.name, "orders-demo"),
+              from: now()-30m
+            | sort arraySum(msg) desc
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1102-00000000002a
+      type: markdown
+      markdown: |-
+        **Source view (broker perspective) — OneAgent's built-in Kafka sensor.** `kafka.consumer_group.lag` tells you how far behind each consumer group is; `kafka.request.time.99p` tells you broker request latency; `kafka.purgatory.size` tells you how many requests are waiting in the broker's purgatory. These reflect what the broker is actually experiencing, regardless of how many consumers are attached.
+
+    - id: 00000000-0000-0000-1102-00000000002b
+      type: dql
+      state:
+        input:
+          value: |-
+            // Broker-side Kafka metrics from OneAgent's built-in sensor
+            timeseries {
+                brokers        = avg(kafka.brokers),
+                request_p99_ms = avg(kafka.request.time.99p),
+                purgatory_size = avg(kafka.purgatory.size),
+                consumer_lag   = sum(kafka.consumer_group.lag)
+              },
+              from: now()-30m
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1102-00000000002c
+      type: markdown
+      markdown: |-
+        Putting DB and messaging side-by-side:
+
+        | | **Caller/client view** | **Source/infrastructure view** |
+        |---|---|---|
+        | DB | client JDBC span count + latency | `postgres.*` from postgres-exporter → otel-postgres extension |
+        | Messaging | `dt.service.messaging.process.count` on the consumer | `kafka.*` from OneAgent built-in Kafka sensor |
+
+        **The gap that lands in a future SDv2-for-OneAgent release.** Today these two worlds — the client's view and the source view — are independent; you manually correlate them by time. A telemetry-based topology pipeline, in active development, adds the missing link for DB: `dt.service.database.*` metrics written on the calling service that **point at the real DB entity**. Same data shape as today, but the owner changes — queries and alerts anchor on the database, not on a caller's surrogate.
+
+        The messaging equivalent (producer/consumer span → broker entity) is less mature; the broker-as-owner destination for messaging is further out. Until then, `kafka.*` metrics live on the broker entity and `messaging.process.*` live on the caller; they're two independent worlds held together by a human looking at two charts.
 
     - id: 00000000-0000-0000-1102-00000000000e
       type: markdown

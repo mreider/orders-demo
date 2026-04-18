@@ -27,23 +27,25 @@ The UI's **Transactions** column is the coalesced sum across all three.
 - Kafka consume activity **double-counts** today — shows up in both `request.*` AND `messaging.process.*`
 - On `OrderEventsListener`: `dt.service.request.count` reads ~240/min with `endpoint.name = NON_KEY_REQUESTS` (Classic artifact)
 - Predates dedicated messaging families
-- **Goes away when SDv2 for OneAgent GAs in June 2026** — `request.*` becomes HTTP-only
+- **Goes away in a future SDv2-for-OneAgent release** — `request.*` becomes HTTP-only
 
 Don't sum families in alerts until this lands.
 
 ---
 
-# Downstreams are tabs, not entities
+# Downstream tabs — caller today, real entity tomorrow
 
-| Tab | Metric family | Dimensions |
+| Tab | Metric family (target) | Dimensions |
 |---|---|---|
-| **DB Queries** | `dt.service.database.query.*` | `db.system.name`, `db.operation.name`, `server.address` |
+| **DB Queries** | `dt.service.database.*` | `db.system`, `db.operation.name`, `server.address` |
 | **Message Processing** | `dt.service.messaging.process.*` | `messaging.destination.name`, `messaging.system` |
 | **Outbound Calls** | `dt.service.thirdparty.*` + client spans | host, endpoint, status |
 
-Database identity lives on the JDBC client span, owned by the calling service. Classic's `DATABASE_SERVICE` / `MESSAGING_SERVICE` / `EXTERNAL_SERVICE` entities are gone — relocation, not removal.
+**SDv1:** measures the client-side call and labels it "the database." Latency is the round-trip from the caller — not what's happening inside Postgres.
 
-**This is a Latest-app feature, not SDv2-only.** Works on modern SDv1 too.
+**SDv2 target:** the metric links to the **real DB entity** (produced by a Postgres extension). Query latency, alerts, RCA run on the database itself. **Landing in a future SDv2-for-OneAgent release.**
+
+Messaging follows the same vision; broker-as-owner linking is less mature.
 
 ---
 
@@ -85,6 +87,8 @@ Same answer. Fewer lines, fewer scanned records, stable across entity re-detecti
 - **`SERVICE_DEPLOYMENT`** — per-env entity orthogonal to SERVICE; `staging` vs `prod` without splitting identity (maps to Datadog's `service`+`env`+`version`)
 - **Primary Fields as metric dimensions** — `k8s.cluster.name`, tags become first-class on service metrics
 - **Services app rewire to timeseries-first** — list + detail pages go query-led
+- **`dt.service.database.*` linked to real DB entities** — future SDv2-for-OneAgent release; span data is already shaped correctly
+- **Messaging → broker entity** — same idea, further out
 
 *Direction firm, timing not — road shape, not arrival date.*
 
