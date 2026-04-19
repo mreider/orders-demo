@@ -18,7 +18,7 @@ content:
 
         One notebook, two parts, ten DQL questions.
 
-        **Part 1 — One workload, one service** (questions 1-4): how SDv2 collapses the `dt.service.name` and `dt.entity.service` fragmentation that SDv1 produces, and how `OTEL_SERVICE_NAME` acts as a prefix on every SDv1 fragment. [Narrative on GitHub.](https://github.com/mreider/orders-demo/blob/main/presentation/01-one-workload-one-service.md)
+        **Part 1 — One workload, one service** (questions 1-4): how SDv2 collapses the `dt.service.name` and `dt.entity.service` fragmentation that SDv1 produces. A short detour covers a separate 2026-Q1 fix — Dynatrace service naming rules (`builtin:naming.services`) are deprecated, so SDv1 detection now prefixes every fragment with `service.name` as a short-term bridge until pipeline-side naming takes over (Part 2's "What's coming"). [Narrative on GitHub.](https://github.com/mreider/orders-demo/blob/main/presentation/01-one-workload-one-service.md)
 
         **Part 2 — Dimensions do the slicing** (questions 5-10, plus 9b): metric families, the legacy `request.*`-for-messaging overlap that goes away in a future SDv2-for-OneAgent release, `endpoint.name`, downstreams as dimensions on the caller, metric-first DQL, and a side-by-side of the "fake" SDv1 DB service (measured on the caller) vs the real source-side Postgres metrics that will own health once database topology linking lands. [Narrative on GitHub.](https://github.com/mreider/orders-demo/blob/main/presentation/02-dimensions-do-the-slicing.md)
 
@@ -225,21 +225,42 @@ content:
       markdown: |-
         ## Question 5: What metric families does this service produce?
 
-        Three families cover entry-point activity: HTTP/gRPC requests, messaging consumption, FaaS invocations. The UI's **Transactions** column is the coalesced sum.
+        Three families cover entry-point activity: HTTP/gRPC requests, messaging consumption, FaaS invocations. The UI's **Transactions** column is the coalesced sum across all three.
+
+        The Spring Boot `orders-demo` app produces two of the three. `dt.service.faas_invoke.*` only exists when a Lambda / Azure Function invokes the service, which isn't the case here — it's shown separately below so its absence is a data point, not a query error.
 
     - id: 00000000-0000-0000-1102-000000000003
       type: dql
       state:
         input:
           value: |-
+            // Request + messaging for the SDv2 workload.
+            // Combining these in one timeseries works because both families carry
+            // k8s.namespace.name and k8s.workload.name as dimensions.
             timeseries {
-              requests = sum(dt.service.request.count),
-              messaging = sum(dt.service.messaging.process.count),
-              faas = sum(dt.service.faas_invoke.count)
+              requests  = sum(dt.service.request.count),
+              messaging = sum(dt.service.messaging.process.count)
             },
-            filter: matchesValue(k8s.namespace.name, "orders-sdv2")
-              AND matchesValue(k8s.workload.name, "orders-demo"),
+            filter: k8s.namespace.name == "orders-sdv2"
+              AND k8s.workload.name == "orders-demo",
             from: now()-30m
+          timeframe:
+            from: now()-30m
+            to: now()
+        visualization: lineChart
+
+    - id: 00000000-0000-0000-1102-000000000030
+      type: dql
+      state:
+        input:
+          value: |-
+            // FaaS family on its own — expected to be empty on a K8s Spring Boot app.
+            // Query returns one series with all-null values, confirming the family
+            // is absent for this workload rather than an error.
+            timeseries faas = sum(dt.service.faas_invoke.count),
+              filter: k8s.namespace.name == "orders-sdv2"
+                AND k8s.workload.name == "orders-demo",
+              from: now()-30m
           timeframe:
             from: now()-30m
             to: now()
@@ -248,7 +269,9 @@ content:
     - id: 00000000-0000-0000-1102-000000000004
       type: markdown
       markdown: |-
-        Read: `orders-demo` populates `request.*` (k6 hitting /orders, /inventory) and `messaging.process.*` (Kafka consume on `order-events`). `faas_invoke.*` stays empty — no Lambda here.
+        Read: `orders-demo` populates `request.*` (k6 hitting /orders, /inventory) and `messaging.process.*` (Kafka consume on `order-events`). `faas_invoke.*` stays empty because nothing is invoking this service from a serverless trigger.
+
+        **Why two queries instead of one.** Combining metrics in a single `timeseries { a=..., b=..., c=... }` block only returns data when **every** metric has at least one matching series under the filter. If even one of the three is empty — as `faas_invoke` is here — the combined block returns zero rows. Splitting the empty family into its own query keeps the useful signal visible.
 
     - id: 00000000-0000-0000-1102-000000000020
       type: markdown
