@@ -107,26 +107,41 @@ for ns in orders-sdv1 orders-sdv2; do
   kubectl -n "${ns}" rollout status deployment/postgres-exporter  --timeout=120s
 done
 
-log "Applying app Deployments (image: ${ORDERS_IMAGE})"
-envsubst '${ORDERS_IMAGE}' < "${ROOT}/k8s/30-app.yaml"       | kubectl apply -f -
-envsubst '${ORDERS_IMAGE}' < "${ROOT}/k8s/31-app-named.yaml" | kubectl apply -f -
-
-for ns in orders-sdv1 orders-sdv2; do
-  kubectl -n "${ns}" rollout status deployment/orders-demo --timeout=300s
-done
-kubectl -n orders-sdv1 rollout status deployment/orders-demo-named --timeout=300s
-
-# ---- 7. load gen ----
-log "Creating load-gen ConfigMaps from load/loadtest.js"
-for ns in orders-sdv1 orders-sdv2; do
+# ---- 7. example1-7 workloads (Enhanced Endpoints guide demo) ----
+# Each example namespace gets its own loadgen ConfigMap before workloads
+# come up so the loadgen pods can mount the script.
+log "Creating loadgen ConfigMaps in example namespaces"
+for ns in example1-empty example2-keyreq example3-ee-on example6-sdv2; do
   kubectl -n "${ns}" create configmap loadtest-script \
     --from-file=loadtest.js="${ROOT}/load/loadtest.js" \
     --dry-run=client -o yaml | kubectl apply -f -
 done
+for ns in example4-rule example4b-custom-placeholder example5-overcollapse \
+         example7-sdv2-overcollapse example8-sdv2-fallback \
+         example9-sdv2-pattern-rule example10-sdv1-fallback; do
+  kubectl -n "${ns}" create configmap loadtest-script-legacy \
+    --from-file=loadtest.js="${ROOT}/load/loadtest-legacy.js" \
+    --dry-run=client -o yaml | kubectl apply -f -
+done
 
-log "Applying loadgen Deployments (always-on k6 via while-true wrapper)"
-kubectl apply -f "${ROOT}/k8s/40-load.yaml"
-kubectl apply -f "${ROOT}/k8s/41-load-named.yaml"
+log "Applying example1-10 workload manifests"
+for f in 60-example1-empty.yaml 61-example2-keyreq.yaml 62-example3-ee-on.yaml \
+         63-example4-rule.yaml 63b-example4b-custom-placeholder.yaml \
+         64-example5-overcollapse.yaml \
+         65-example6-sdv2.yaml 66-example7-sdv2-overcollapse.yaml \
+         67-example8-sdv2-fallback.yaml 68-example9-sdv2-pattern-rule.yaml \
+         69-example10-sdv1-fallback.yaml; do
+  envsubst '${ORDERS_IMAGE}' < "${ROOT}/k8s/${f}" | kubectl apply -f -
+done
+
+for ns in example1-empty example2-keyreq example3-ee-on example6-sdv2; do
+  kubectl -n "${ns}" rollout status deployment/$(echo "${ns}" | sed 's/-.*$//')-app --timeout=300s
+done
+for ns in example4-rule example5-overcollapse example7-sdv2-overcollapse \
+         example8-sdv2-fallback example9-sdv2-pattern-rule example10-sdv1-fallback; do
+  kubectl -n "${ns}" rollout status deployment/$(echo "${ns}" | sed 's/-.*$//')-shop --timeout=180s
+done
+kubectl -n example4b-custom-placeholder rollout status deployment/example4b-shop --timeout=180s
 
 # ---- 8. next steps ----
 cat <<EOF
@@ -136,20 +151,22 @@ orders-demo is deploying.
 
 Next steps (manual):
 
-1. Opt orders-sdv2 into SDv2 detection:
-   Dynatrace UI > Kubernetes > ${GKE_CLUSTER} > namespace orders-sdv2
-   > Settings > Service detection > Service Detection v2 for OneAgent > enable.
-   (Leave orders-sdv1 on default SDv1.)
+1. Per-example Dynatrace settings (see chats/services-guide/enhanced-endpoints-guide-orders-demo.md §3):
+   - example2-keyreq: create Key Request \`{keyRequestNames: ["search"]}\` on the example2-app OrderController SERVICE
+   - example3-ee-on, example4-rule, example5-overcollapse: enable EE on each namespace
+   - example4-rule: also create a Request Naming Rule \`{Method} {URL:Path-Clean}\` (UI / legacy API)
+   - example6-sdv2, example7-sdv2-overcollapse: enable SDv2 detection on each namespace
 
-2. Wait ~5 minutes for the UNIFIED entity to appear.
+2. Wait ~5-15 minutes for namespace and SERVICE entities to appear in Dynatrace.
 
 3. Load the demo notebook into your tenant:
    export DT_ENV=https://<your-tenant>.apps.dynatrace.com
    export DT_PLATFORM_TOKEN=dt0s16.XXXX...
    ./scripts/load-demos.sh
 
-4. Walk the presentation:
-   Notebooks app > filter "SDv2 demo" > open "SDv2 demo" > run questions 1-10 in order.
+4. Walk the Enhanced Endpoints guide examples 1-7 in any order; the only
+   mid-demo toggle is the SDv1 heuristic flag (Slack APPOBS) between
+   example 5/7 and example 5/7 "after" snapshots.
 
 Teardown: ./scripts/down.sh
 ======================================================================

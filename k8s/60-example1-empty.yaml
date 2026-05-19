@@ -1,0 +1,92 @@
+# Phase 1 — SDv1 baseline. No Key Request, no EE.
+# Spring Boot app exercises clean Spring routes. EE off on this namespace,
+# so neither Classic nor the new Services app shows any endpoint rows.
+# Postgres + Kafka come from orders-sdv1 via cross-namespace Service refs.
+apiVersion: v1
+kind: Service
+metadata:
+  name: example1-app
+  namespace: example1-empty
+spec:
+  selector: { app: example1-app }
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example1-app
+  namespace: example1-empty
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: example1-app }
+  template:
+    metadata:
+      labels: { app: example1-app }
+    spec:
+      containers:
+        - name: example1-app
+          image: ghcr.io/mreider/orders-demo:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 8080 }]
+          env:
+            - name: DB_URL
+              value: jdbc:postgresql://postgres.orders-sdv1.svc.cluster.local:5432/orders
+            - name: DB_USER
+              value: orders
+            - name: DB_PASSWORD
+              value: orders
+            - name: KAFKA_BOOTSTRAP
+              value: kafka.orders-sdv1.svc.cluster.local:9092
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms256m -Xmx512m"
+            - name: OTEL_SERVICE_NAME
+              value: example1-app
+          startupProbe:
+            tcpSocket: { port: 8080 }
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket: { port: 8080 }
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            tcpSocket: { port: 8080 }
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            requests: { cpu: "200m", memory: "512Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen-example1
+  namespace: example1-empty
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: loadgen-example1 }
+  template:
+    metadata:
+      labels: { app: loadgen-example1 }
+    spec:
+      containers:
+        - name: k6
+          image: grafana/k6:0.54.0
+          command: ["/bin/sh", "-c"]
+          args:
+            - "while true; do k6 run /scripts/loadtest.js; sleep 1; done"
+          env:
+            - { name: BASE_URL, value: "http://example1-app:8080" }
+            - { name: DURATION, value: "30m" }
+          volumeMounts:
+            - { name: script, mountPath: /scripts }
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "256Mi" }
+      volumes:
+        - name: script
+          configMap: { name: loadtest-script }

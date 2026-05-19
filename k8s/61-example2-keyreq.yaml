@@ -1,0 +1,85 @@
+# Phase 2 — SDv1 baseline + Key Request on `search`. EE still off.
+# Same workload as example1; the only difference is a Settings 2.0 Key Request
+# object scoped to this phase's OrderController service (applied separately
+# via dtctl after the service entity surfaces in Dynatrace).
+apiVersion: v1
+kind: Service
+metadata:
+  name: example2-app
+  namespace: example2-keyreq
+spec:
+  selector: { app: example2-app }
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example2-app
+  namespace: example2-keyreq
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: example2-app }
+  template:
+    metadata:
+      labels: { app: example2-app }
+    spec:
+      containers:
+        - name: example2-app
+          image: ghcr.io/mreider/orders-demo:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 8080 }]
+          env:
+            - { name: DB_URL,            value: jdbc:postgresql://postgres.orders-sdv1.svc.cluster.local:5432/orders }
+            - { name: DB_USER,           value: orders }
+            - { name: DB_PASSWORD,       value: orders }
+            - { name: KAFKA_BOOTSTRAP,   value: kafka.orders-sdv1.svc.cluster.local:9092 }
+            - { name: JAVA_TOOL_OPTIONS, value: "-Xms256m -Xmx512m" }
+            - { name: OTEL_SERVICE_NAME, value: example2-app }
+          startupProbe:
+            tcpSocket: { port: 8080 }
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket: { port: 8080 }
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            tcpSocket: { port: 8080 }
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            requests: { cpu: "200m", memory: "512Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen-example2
+  namespace: example2-keyreq
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: loadgen-example2 }
+  template:
+    metadata:
+      labels: { app: loadgen-example2 }
+    spec:
+      containers:
+        - name: k6
+          image: grafana/k6:0.54.0
+          command: ["/bin/sh", "-c"]
+          args: ["while true; do k6 run /scripts/loadtest.js; sleep 1; done"]
+          env:
+            - { name: BASE_URL, value: "http://example2-app:8080" }
+            - { name: DURATION, value: "30m" }
+          volumeMounts:
+            - { name: script, mountPath: /scripts }
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "256Mi" }
+      volumes:
+        - name: script
+          configMap: { name: loadtest-script }

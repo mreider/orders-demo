@@ -1,0 +1,119 @@
+# Example 8 — SDv2 + Fallback HTTP endpoint rule enabled for this namespace.
+# Same Nginx workload as example7. The endpoint-detection-rule scoped to
+# this namespace re-enables the Fallback "{method} /*" rule, producing the
+# textbook GET /* over-collapse shape (compared to example7 which falls
+# through to span.name = "GET").
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example8-shop-nginx
+  namespace: example8-sdv2-fallback
+data:
+  nginx.conf: |
+    worker_processes 1;
+    events { worker_connections 1024; }
+    http {
+      access_log /dev/stdout;
+      error_log  /dev/stderr;
+      upstream orders {
+        server example1-app.example1-empty.svc.cluster.local:8080;
+      }
+      server {
+        listen 8080;
+        location ~ ^/shop/products/[^/]+$ {
+          rewrite ^.*$ /inventory/check?sku=SKU-1001 break;
+          proxy_pass http://orders;
+        }
+        location ~ ^/shop/carts/[^/]+/items/[^/]+$ {
+          rewrite ^.*$ /inventory/check?sku=SKU-1002 break;
+          proxy_pass http://orders;
+        }
+        location ~ ^/shop/orders/[^/]+$ {
+          rewrite ^.*$ /orders/search?sku=SKU-1003 break;
+          proxy_pass http://orders;
+        }
+        location = /shop/checkout {
+          rewrite ^.*$ /orders/submit break;
+          proxy_pass http://orders;
+        }
+        location = /healthz {
+          return 200 'ok\n';
+          add_header Content-Type text/plain;
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example8-shop
+  namespace: example8-sdv2-fallback
+spec:
+  selector: { app: example8-shop }
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example8-shop
+  namespace: example8-sdv2-fallback
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: example8-shop }
+  template:
+    metadata:
+      labels: { app: example8-shop }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports: [{ containerPort: 8080 }]
+          env:
+            - { name: OTEL_SERVICE_NAME, value: example8-shop }
+          volumeMounts:
+            - { name: conf, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf }
+          readinessProbe:
+            tcpSocket: { port: 8080 }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: 8080 }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "100m", memory: "64Mi" }
+            limits:   { cpu: "500m", memory: "128Mi" }
+      volumes:
+        - name: conf
+          configMap: { name: example8-shop-nginx }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen-example8
+  namespace: example8-sdv2-fallback
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: loadgen-example8 }
+  template:
+    metadata:
+      labels: { app: loadgen-example8 }
+    spec:
+      containers:
+        - name: k6
+          image: grafana/k6:0.54.0
+          command: ["/bin/sh", "-c"]
+          args: ["while true; do k6 run /scripts/loadtest.js; sleep 1; done"]
+          env:
+            - { name: BASE_URL, value: "http://example8-shop:8080" }
+            - { name: DURATION, value: "30m" }
+          volumeMounts:
+            - { name: script, mountPath: /scripts }
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "256Mi" }
+      volumes:
+        - name: script
+          configMap: { name: loadtest-script-legacy }

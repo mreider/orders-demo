@@ -1,0 +1,123 @@
+# Phase 4 — Nginx workload (volatile paths) + Request Naming Rule.
+# EE on. Spans have no http.route, so EE alone would collapse to GET /*.
+# The naming rule (created via UI or legacy API) layers in at priority 2
+# and reshapes endpoint names from the URL path before the heuristic runs.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example4-shop-nginx
+  namespace: example4-rule
+data:
+  nginx.conf: |
+    worker_processes 1;
+    events { worker_connections 1024; }
+    http {
+      access_log /dev/stdout;
+      error_log  /dev/stderr;
+
+      # Upstream points at example1-app (stable, untouched by EE settings).
+      # The Nginx server span is what matters here.
+      upstream orders {
+        server example1-app.example1-empty.svc.cluster.local:8080;
+      }
+
+      server {
+        listen 8080;
+
+        location ~ ^/shop/products/[^/]+$ {
+          rewrite ^.*$ /inventory/check?sku=SKU-1001 break;
+          proxy_pass http://orders;
+        }
+        location ~ ^/shop/carts/[^/]+/items/[^/]+$ {
+          rewrite ^.*$ /inventory/check?sku=SKU-1002 break;
+          proxy_pass http://orders;
+        }
+        location ~ ^/shop/orders/[^/]+$ {
+          rewrite ^.*$ /orders/search?sku=SKU-1003 break;
+          proxy_pass http://orders;
+        }
+        location = /shop/checkout {
+          rewrite ^.*$ /orders/submit break;
+          proxy_pass http://orders;
+        }
+        location = /healthz {
+          return 200 'ok\n';
+          add_header Content-Type text/plain;
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example4-shop
+  namespace: example4-rule
+spec:
+  selector: { app: example4-shop }
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example4-shop
+  namespace: example4-rule
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: example4-shop }
+  template:
+    metadata:
+      labels: { app: example4-shop }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports: [{ containerPort: 8080 }]
+          env:
+            - { name: OTEL_SERVICE_NAME, value: example4-shop }
+          volumeMounts:
+            - { name: conf, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf }
+          readinessProbe:
+            tcpSocket: { port: 8080 }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: 8080 }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "100m", memory: "64Mi" }
+            limits:   { cpu: "500m", memory: "128Mi" }
+      volumes:
+        - name: conf
+          configMap: { name: example4-shop-nginx }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen-example4
+  namespace: example4-rule
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: loadgen-example4 }
+  template:
+    metadata:
+      labels: { app: loadgen-example4 }
+    spec:
+      containers:
+        - name: k6
+          image: grafana/k6:0.54.0
+          command: ["/bin/sh", "-c"]
+          args: ["while true; do k6 run /scripts/loadtest.js; sleep 1; done"]
+          env:
+            - { name: BASE_URL, value: "http://example4-shop:8080" }
+            - { name: DURATION, value: "30m" }
+          volumeMounts:
+            - { name: script, mountPath: /scripts }
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "256Mi" }
+      volumes:
+        - name: script
+          configMap: { name: loadtest-script-legacy }

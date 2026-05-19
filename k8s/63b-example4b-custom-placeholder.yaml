@@ -1,0 +1,120 @@
+# example4b: SDv1 Nginx + EE on + Request Naming Rule with a custom
+# placeholder that strips the last URL path segment. Demonstrates how to
+# handle ID shapes that {URL:Path-Clean} does not recognize on its own
+# (short mixed-case alphanumerics, etc.). Same workload pattern as
+# example4-shop; the rule is attached separately through the Settings 2.0
+# legacy /api/config/v1 surface.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example4b-shop-nginx
+  namespace: example4b-custom-placeholder
+data:
+  nginx.conf: |
+    worker_processes 1;
+    events { worker_connections 1024; }
+    http {
+      access_log /dev/stdout;
+      error_log  /dev/stderr;
+      upstream orders {
+        server example1-app.example1-empty.svc.cluster.local:8080;
+      }
+      server {
+        listen 8080;
+        location ~ ^/shop/products/[^/]+$ {
+          rewrite ^.*$ /inventory/check?sku=SKU-1001 break;
+          proxy_pass http://orders;
+        }
+        location ~ ^/shop/carts/[^/]+/items/[^/]+$ {
+          rewrite ^.*$ /inventory/check?sku=SKU-1002 break;
+          proxy_pass http://orders;
+        }
+        location ~ ^/shop/orders/[^/]+$ {
+          rewrite ^.*$ /orders/search?sku=SKU-1003 break;
+          proxy_pass http://orders;
+        }
+        location = /shop/checkout {
+          rewrite ^.*$ /orders/submit break;
+          proxy_pass http://orders;
+        }
+        location = /healthz {
+          return 200 'ok\n';
+          add_header Content-Type text/plain;
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example4b-shop
+  namespace: example4b-custom-placeholder
+spec:
+  selector: { app: example4b-shop }
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example4b-shop
+  namespace: example4b-custom-placeholder
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: example4b-shop }
+  template:
+    metadata:
+      labels: { app: example4b-shop }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports: [{ containerPort: 8080 }]
+          env:
+            - { name: OTEL_SERVICE_NAME, value: example4b-shop }
+          volumeMounts:
+            - { name: conf, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf }
+          readinessProbe:
+            tcpSocket: { port: 8080 }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: 8080 }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "100m", memory: "64Mi" }
+            limits:   { cpu: "500m", memory: "128Mi" }
+      volumes:
+        - name: conf
+          configMap: { name: example4b-shop-nginx }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen-example4b
+  namespace: example4b-custom-placeholder
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: loadgen-example4b }
+  template:
+    metadata:
+      labels: { app: loadgen-example4b }
+    spec:
+      containers:
+        - name: k6
+          image: grafana/k6:0.54.0
+          command: ["/bin/sh", "-c"]
+          args: ["while true; do k6 run /scripts/loadtest.js; sleep 1; done"]
+          env:
+            - { name: BASE_URL, value: "http://example4b-shop:8080" }
+            - { name: DURATION, value: "30m" }
+          volumeMounts:
+            - { name: script, mountPath: /scripts }
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "256Mi" }
+      volumes:
+        - name: script
+          configMap: { name: loadtest-script-legacy }

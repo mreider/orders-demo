@@ -1,0 +1,122 @@
+# Phase 5 — Nginx workload, EE on, NO rule, heuristic flag OFF.
+# Shows the GET /* over-collapse problem. This is the "before" state for
+# Phase 7 (after the flag flip, the same workload normalizes to GET /shop).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example5-shop-nginx
+  namespace: example5-overcollapse
+data:
+  nginx.conf: |
+    worker_processes 1;
+    events { worker_connections 1024; }
+    http {
+      access_log /dev/stdout;
+      error_log  /dev/stderr;
+
+      # Upstream points at example1-app (stable, untouched by EE settings).
+      # The Nginx server span is what matters here.
+      upstream orders {
+        server example1-app.example1-empty.svc.cluster.local:8080;
+      }
+
+      server {
+        listen 8080;
+
+        location ~ ^/shop/products/[^/]+$ {
+          rewrite ^.*$ /inventory/check?sku=SKU-1001 break;
+          proxy_pass http://orders;
+        }
+        location ~ ^/shop/carts/[^/]+/items/[^/]+$ {
+          rewrite ^.*$ /inventory/check?sku=SKU-1002 break;
+          proxy_pass http://orders;
+        }
+        location ~ ^/shop/orders/[^/]+$ {
+          rewrite ^.*$ /orders/search?sku=SKU-1003 break;
+          proxy_pass http://orders;
+        }
+        location = /shop/checkout {
+          rewrite ^.*$ /orders/submit break;
+          proxy_pass http://orders;
+        }
+        location = /healthz {
+          return 200 'ok\n';
+          add_header Content-Type text/plain;
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example5-shop
+  namespace: example5-overcollapse
+spec:
+  selector: { app: example5-shop }
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example5-shop
+  namespace: example5-overcollapse
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: example5-shop }
+  template:
+    metadata:
+      labels: { app: example5-shop }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports: [{ containerPort: 8080 }]
+          env:
+            - { name: OTEL_SERVICE_NAME, value: example5-shop }
+          volumeMounts:
+            - { name: conf, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf }
+          readinessProbe:
+            tcpSocket: { port: 8080 }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: 8080 }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "100m", memory: "64Mi" }
+            limits:   { cpu: "500m", memory: "128Mi" }
+      volumes:
+        - name: conf
+          configMap: { name: example5-shop-nginx }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen-example5
+  namespace: example5-overcollapse
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: loadgen-example5 }
+  template:
+    metadata:
+      labels: { app: loadgen-example5 }
+    spec:
+      containers:
+        - name: k6
+          image: grafana/k6:0.54.0
+          command: ["/bin/sh", "-c"]
+          args: ["while true; do k6 run /scripts/loadtest.js; sleep 1; done"]
+          env:
+            - { name: BASE_URL, value: "http://example5-shop:8080" }
+            - { name: DURATION, value: "30m" }
+          volumeMounts:
+            - { name: script, mountPath: /scripts }
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "256Mi" }
+      volumes:
+        - name: script
+          configMap: { name: loadtest-script-legacy }

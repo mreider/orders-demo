@@ -12,6 +12,8 @@ last_updated: 2026-04-18
 
 A Spring Boot application plus a presentation on the Service Detection v1 to Service Detection v2 migration for OneAgent-monitored workloads. SDv2 for OneAgent is available only on Latest Dynatrace tenants; the presentation assumes a Latest tenant.
 
+> **Note — `enhanced-endpoints-demo` branch:** This branch adds a second demo layered on the same cluster. Ten additional namespaces (`example1-empty` through `example10-sdv1-fallback`) demonstrate Enhanced Endpoints for SDv1, the URL-path-pattern matching mechanism in SDv2, and the upcoming endpoint-naming heuristic. The original SDv1→SDv2 migration content below still applies. See **[ENHANCED-ENDPOINTS.md](ENHANCED-ENDPOINTS.md)** for the branch-specific purpose, setup, and walkthrough.
+
 ## What this is
 
 - A deliberately-small Spring Boot monolith (two REST controllers, a Kafka consumer, a JDBC client) deployed to Kubernetes.
