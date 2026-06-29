@@ -1,0 +1,43 @@
+name: vm-down
+
+on:
+  workflow_dispatch:
+    inputs:
+      vm_name:
+        description: "VM name"
+        default: "orders-demo-vm"
+      zone:
+        description: "GCE zone"
+        default: "us-central1-c"
+      confirm:
+        description: "Type 'delete' to confirm"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  down:
+    if: ${{ inputs.confirm == 'delete' }}
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+      GKE_ZONE: ${{ inputs.zone }}
+      VM_NAME: ${{ inputs.vm_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Delete VM
+        run: |
+          chmod +x scripts/vm-down.sh
+          scripts/vm-down.sh
