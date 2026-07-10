@@ -3,6 +3,7 @@ package com.dynatrace.ordersdemo.web;
 import com.dynatrace.ordersdemo.domain.Order;
 import com.dynatrace.ordersdemo.domain.OrderRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
@@ -16,12 +17,13 @@ import java.util.concurrent.ThreadLocalRandom;
 public class OrderController {
 
     private final OrderRepository orders;
+    // Optional: absent under the "cloudrun" profile, where Kafka is disabled.
     private final KafkaTemplate<String, String> kafka;
     private final ObjectMapper json = new ObjectMapper();
 
-    public OrderController(OrderRepository orders, KafkaTemplate<String, String> kafka) {
+    public OrderController(OrderRepository orders, ObjectProvider<KafkaTemplate<String, String>> kafka) {
         this.orders = orders;
-        this.kafka = kafka;
+        this.kafka = kafka.getIfAvailable();
     }
 
     @PostMapping("/submit")
@@ -33,13 +35,15 @@ public class OrderController {
         Order o = new Order(id, req.sku(), req.quantity(), "PENDING", Instant.now());
         orders.save(o);
 
-        Map<String, Object> payload = Map.of(
-                "orderId", id.toString(),
-                "sku", req.sku(),
-                "quantity", req.quantity(),
-                "bad", req.bad()
-        );
-        kafka.send("order-events", id.toString(), json.writeValueAsString(payload));
+        if (kafka != null) {
+            Map<String, Object> payload = Map.of(
+                    "orderId", id.toString(),
+                    "sku", req.sku(),
+                    "quantity", req.quantity(),
+                    "bad", req.bad()
+            );
+            kafka.send("order-events", id.toString(), json.writeValueAsString(payload));
+        }
 
         return ResponseEntity.status(201).body(Map.of("orderId", id.toString(), "status", "PENDING"));
     }

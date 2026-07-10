@@ -1,0 +1,28 @@
+# "cloudrun" profile: run orders-demo standalone on GCP Cloud Run.
+# Same app image, but no external Postgres/Kafka — so SDv2 detects the same
+# HTTP endpoints (/orders/*, /inventory/*) on a serverless workload, now
+# carrying cloud.* / faas.* attributes.
+spring:
+  # No Kafka broker in this environment.
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+  datasource:
+    url: jdbc:h2:mem:orders;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      # Hibernate builds the schema in H2; Flyway's Postgres DDL is skipped.
+      ddl-auto: create-drop
+    defer-datasource-initialization: true
+  flyway:
+    enabled: false
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:data-cloudrun.sql
+
+# Cloud Run injects the port to listen on via $PORT (default 8080).
+server:
+  port: ${PORT:8080}

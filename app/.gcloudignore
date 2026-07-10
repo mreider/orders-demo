@@ -1,0 +1,4 @@
+# Cloud Build rebuilds from source inside the image; skip local build output.
+target/
+.mvn/
+*.iml

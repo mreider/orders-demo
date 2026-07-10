@@ -4,6 +4,9 @@ package.json
 exports/
 bin/
 
+# Maven build output
+target/
+
 scripts/capture.js
 
 .DS_Store

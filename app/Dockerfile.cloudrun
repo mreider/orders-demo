@@ -1,0 +1,35 @@
+# Cloud Run image: same build as the GKE Dockerfile, plus the Dynatrace
+# OneAgent code module baked in (application-only monitoring). This is what
+# produces spans -> SDv2 service/endpoint detection with cloud.*/faas.*
+# attributes for the serverless workload.
+#
+# The tenant API endpoint and InstallerDownload token are passed at build time
+# via --build-arg (see app/cloudbuild.cloudrun.yaml) so no secret lives in git.
+FROM maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /src
+COPY pom.xml .
+RUN mvn -B -q dependency:go-offline
+COPY src ./src
+RUN mvn -B -q -DskipTests package
+
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=build /src/target/orders-demo.jar /app/app.jar
+
+# --- Dynatrace OneAgent (Java code module) ---
+ARG DT_API_URL
+ARG DT_API_TOKEN
+ARG DT_ONEAGENT_OPTIONS="flavor=default&include=java"
+ENV DT_HOME="/opt/dynatrace/oneagent"
+RUN apt-get update && \
+    apt-get install -y wget unzip && \
+    mkdir -p "$DT_HOME" && \
+    wget -O "$DT_HOME/oneagent.zip" "$DT_API_URL/v1/deployment/installer/agent/unix/paas/latest?Api-Token=$DT_API_TOKEN&$DT_ONEAGENT_OPTIONS" && \
+    unzip -d "$DT_HOME" "$DT_HOME/oneagent.zip" && \
+    rm "$DT_HOME/oneagent.zip" && \
+    rm -rf /var/lib/apt/lists/*
+ENV LD_PRELOAD=/opt/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+# --- end OneAgent ---
+
+EXPOSE 8080
+ENTRYPOINT ["java","-jar","/app/app.jar"]

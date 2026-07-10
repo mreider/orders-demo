@@ -1,0 +1,45 @@
+# Build the Cloud Run image (app + OneAgent code module), push to Artifact
+# Registry, and deploy to Cloud Run. The DT installer token is passed as a
+# substitution at submit time (never committed).
+#
+# Usage:
+#   gcloud builds submit app/ \
+#     --config app/cloudbuild.cloudrun.yaml \
+#     --substitutions _DT_API_URL="https://abl46885.dev.dynatracelabs.com/api",_DT_API_TOKEN="dt0c01.XXXX"
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - build
+      - '-f'
+      - 'Dockerfile.cloudrun'
+      - '--build-arg'
+      - 'DT_API_URL=${_DT_API_URL}'
+      - '--build-arg'
+      - 'DT_API_TOKEN=${_DT_API_TOKEN}'
+      - '-t'
+      - '${_IMAGE}'
+      - '.'
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_IMAGE}']
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - '${_SERVICE}'
+      - '--image=${_IMAGE}'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--execution-environment=gen2'
+      - '--set-env-vars=DT_TAGS=orders-demo-cloudrun,SPRING_PROFILES_ACTIVE=cloudrun,DT_LOGLEVELCON=INFO'
+substitutions:
+  _IMAGE: 'us-central1-docker.pkg.dev/dynatrace-dev-on-demand/orders-demo/orders-demo-cloudrun:latest'
+  _SERVICE: 'orders-demo-cloudrun'
+  _REGION: 'us-central1'
+  _DT_API_URL: ''
+  _DT_API_TOKEN: ''
+images:
+  - '${_IMAGE}'
+options:
+  logging: CLOUD_LOGGING_ONLY
